@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:iot_manager/app/theme.dart';
+import '../features/app_shell/presentation/app_shell.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -8,11 +10,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'IoT Manager',
       debugShowCheckedModeBanner: false,
-      home: const Scaffold(
-        body: Center(
-          child: Text('App initialized'),
-        ),
-      ),
+      home: const AppShell(),
+      theme: AppTheme.basic,
     );
   }
 }
