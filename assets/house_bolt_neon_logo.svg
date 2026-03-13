@@ -1,0 +1,102 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="houseStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#65E7FF"/>
+      <stop offset="55%" stop-color="#19B8FF"/>
+      <stop offset="100%" stop-color="#005DFF"/>
+    </linearGradient>
+
+    <linearGradient id="boltFill" x1="0%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#D9FFFF"/>
+      <stop offset="40%" stop-color="#67E6FF"/>
+      <stop offset="100%" stop-color="#007DFF"/>
+    </linearGradient>
+
+    <linearGradient id="boltShadow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B4AFF"/>
+      <stop offset="100%" stop-color="#001A84"/>
+    </linearGradient>
+
+    <filter id="blueGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#2BCBFF" flood-opacity="0.95"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="22" flood-color="#0C83FF" flood-opacity="0.55"/>
+    </filter>
+
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#49DFFF" flood-opacity="0.95"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#0A79FF" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- transparent background -->
+
+  <!-- house outline -->
+  <g fill="none" stroke="url(#houseStroke)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" filter="url(#blueGlow)">
+    <path d="M235 420 L512 205 L789 420"/>
+    <path d="M250 420 H317"/>
+    <path d="M317 420 V762"/>
+    <path d="M317 762 H707"/>
+    <path d="M707 762 V420"/>
+    <path d="M707 420 H774"/>
+  </g>
+
+  <!-- sparkles -->
+  <g fill="#28D6FF" filter="url(#softGlow)">
+    <path d="M258 324 l12 34 l34 12 l-34 12 l-12 34 l-12 -34 l-34 -12 l34 -12 z"/>
+    <path d="M314 283 l10 28 l28 10 l-28 10 l-10 28 l-10 -28 l-28 -10 l28 -10 z"/>
+    <path d="M658 318 l7 20 l20 7 l-20 7 l-7 20 l-7 -20 l-20 -7 l20 -7 z"/>
+    <path d="M790 267 l9 25 l25 9 l-25 9 l-9 25 l-9 -25 l-25 -9 l25 -9 z"/>
+    <path d="M746 483 l8 22 l22 8 l-22 8 l-8 22 l-8 -22 l-22 -8 l22 -8 z"/>
+  </g>
+
+  <!-- speed/energy slashes behind bolt -->
+  <g fill="#0A5DFF" opacity="0.95" filter="url(#softGlow)">
+    <path d="M385 488 L504 372 L530 386 L410 502 Z"/>
+    <path d="M515 658 L657 498 L682 509 L540 670 Z"/>
+    <path d="M438 679 L492 576 L518 591 L465 694 Z"/>
+  </g>
+
+  <!-- little particles -->
+  <g fill="#1CCFFF" opacity="0.95">
+    <circle cx="480" cy="340" r="4"/>
+    <circle cx="468" cy="382" r="4"/>
+    <circle cx="456" cy="425" r="4"/>
+    <circle cx="446" cy="468" r="4"/>
+    <circle cx="719" cy="358" r="4"/>
+    <circle cx="731" cy="392" r="4"/>
+    <circle cx="739" cy="426" r="4"/>
+    <circle cx="748" cy="458" r="4"/>
+    <circle cx="718" cy="520" r="4"/>
+    <circle cx="706" cy="546" r="4"/>
+    <circle cx="694" cy="574" r="4"/>
+    <circle cx="682" cy="600" r="4"/>
+  </g>
+
+  <!-- bolt shadow plate -->
+  <path d="M348 596 L565 318 L671 394 L462 678 Z"
+        fill="url(#boltShadow)" opacity="0.95" filter="url(#softGlow)"/>
+
+  <!-- main bolt -->
+  <path d="M674 160
+           L546 417
+           L662 417
+           L424 834
+           L522 561
+           L406 561 Z"
+        fill="url(#boltFill)"
+        stroke="#0576FF"
+        stroke-width="10"
+        stroke-linejoin="round"
+        filter="url(#blueGlow)"/>
+
+  <!-- inner highlight -->
+  <path d="M627 235
+           L552 385
+           L632 385
+           L483 653
+           L543 515
+           L466 515 Z"
+        fill="#C8FFFF"
+        opacity="0.45"/>
+
+</svg>
