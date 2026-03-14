@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 class AppBackground extends StatelessWidget {
@@ -14,15 +12,15 @@ class AppBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return Container(
+    return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            cs.primary.withValues(alpha: 0.14),
-            cs.secondary.withValues(alpha: 0.10),
-            cs.tertiary.withValues(alpha: 0.08),
+            cs.primary.withValues(alpha: 0.10),
+            cs.secondary.withValues(alpha: 0.07),
+            cs.tertiary.withValues(alpha: 0.05),
             cs.surface,
           ],
         ),
@@ -30,35 +28,37 @@ class AppBackground extends StatelessWidget {
       child: Stack(
         children: [
           Positioned(
-            top: -80,
-            left: -60,
-            child: _BlurCircle(
-              size: 220,
-              color: cs.primary.withValues(alpha: 0.18),
-            ),
+            top: -70,
+            left: -50,
+            child: _SoftCircle(size: 180, color: cs.primary.withValues(alpha: 0.12),),
           ),
           Positioned(
-            bottom: -100,
-            right: -50,
-            child: _BlurCircle(
-              size: 260,
-              color: cs.secondary.withValues(alpha: 0.16),
-            ),
+            top: 120,
+            right: -30,
+            child: _SoftCircle(size: 110, color: cs.tertiary.withValues(alpha: 0.08),),
           ),
-          Positioned.fill(
-            child: SafeArea(child: child),
+          Positioned(
+            bottom: -90,
+            right: -40,
+            child: _SoftCircle(size: 220, color: cs.secondary.withValues(alpha: 0.10),),
           ),
+          Positioned(
+            bottom: 140,
+            left: -20,
+            child: _SoftCircle(size: 90, color: cs.primary.withValues(alpha: 0.06),),
+          ),
+          Positioned.fill(child: SafeArea(child: child),),
         ],
       ),
     );
   }
 }
 
-class _BlurCircle extends StatelessWidget {
+class _SoftCircle extends StatelessWidget {
   final double size;
   final Color color;
 
-  const _BlurCircle({
+  const _SoftCircle({
     required this.size,
     required this.color,
   });
@@ -66,17 +66,12 @@ class _BlurCircle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: ClipOval(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-          child: Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color,
-            ),
-          ),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color,
         ),
       ),
     );

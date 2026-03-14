@@ -196,35 +196,52 @@ class HomePageState extends State<HomePage> {
             ),
           ),
           const SizedBox(height: 18),
-          GridView.count(
-            crossAxisCount: MediaQuery.of(context).size.width > 700 ? 3 : 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.10,
-            children: [
-              QuickStatCard(
-                label: 'Hogares',
-                value: controller.totalHomes.toString(),
-                icon: Icons.home_work_outlined,
-              ),
-              QuickStatCard(
-                label: 'Dispositivos',
-                value: controller.totalDevices.toString(),
-                icon: Icons.devices_other_outlined,
-              ),
-              QuickStatCard(
-                label: 'Activos',
-                value: controller.activeDevices.toString(),
-                icon: Icons.bolt_rounded,
-              ),
-              QuickStatCard(
-                label: 'Consumo hoy',
-                value: '${controller.totalTodayWh.toStringAsFixed(0)} Wh',
-                icon: Icons.energy_savings_leaf_outlined,
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth > 700;
+              final itemWidth = isWide
+                  ? (constraints.maxWidth - 24) / 3
+                  : (constraints.maxWidth - 12) / 2;
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: itemWidth,
+                    child: QuickStatCard(
+                      label: 'Hogares',
+                      value: controller.totalHomes.toString(),
+                      icon: Icons.home_work_outlined,
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: QuickStatCard(
+                      label: 'Dispositivos',
+                      value: controller.totalDevices.toString(),
+                      icon: Icons.devices_other_outlined,
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: QuickStatCard(
+                      label: 'Activos',
+                      value: controller.activeDevices.toString(),
+                      icon: Icons.bolt_rounded,
+                    ),
+                  ),
+                  SizedBox(
+                    width: itemWidth,
+                    child: QuickStatCard(
+                      label: 'Consumo hoy',
+                      value: '${controller.totalTodayWh.toStringAsFixed(0)} Wh',
+                      icon: Icons.energy_savings_leaf_outlined,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 22),
           Row(

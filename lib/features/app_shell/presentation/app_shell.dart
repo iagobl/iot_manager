@@ -90,6 +90,7 @@ class _AppShellState extends State<AppShell> {
             labelBehavior:
             NavigationDestinationLabelBehavior.onlyShowSelected,
             onDestinationSelected: (index) {
+              if (currentIndex == index) return;
               setState(() => currentIndex = index);
             },
             destinations: const [
