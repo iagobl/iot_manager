@@ -2,92 +2,113 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/routes.dart';
-import '../../../core/constants/app_strings.dart';
 import '../../../core/widgets/app_background.dart';
-import '../../auth/presentation/widgets/auth_brand_header.dart';
+import '../../analytics/presentation/pages/analytics_page.dart';
+import '../../devices/presentation/pages/devices_page.dart';
+import '../../home/presentation/pages/home_page.dart';
+import 'widgets/shell_top_bar.dart';
 
-class AppShell extends StatelessWidget {
+class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
-  Future<void> _logout(BuildContext context) async {
+  @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> {
+  int currentIndex = 0;
+
+  static const _pages = [
+    HomePage(),
+    AnalyticsPage(),
+    DevicesPage(),
+  ];
+
+  static const _titles = [
+    ('Inicio', 'Resumen general de tu instalación'),
+    ('Gráficas', 'Visualización de consumos y actividad'),
+    ('Dispositivos', 'Listado de dispositivos asociados'),
+  ];
+
+  Future<void> _logout() async {
     await Supabase.instance.client.auth.signOut();
 
-    if (!context.mounted) return;
+    if (!mounted) return;
 
-    Navigator.of(context).pushNamedAndRemoveUntil(Routes.authGate, (_) => false,);
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      Routes.authGate,
+          (_) => false,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = Supabase.instance.client.auth.currentUser;
-    final email = user?.email ?? 'Sin correo';
+    final cs = Theme.of(context).colorScheme;
+    final title = _titles[currentIndex].$1;
+    final subtitle = _titles[currentIndex].$2;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppStrings.appName),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Cerrar sesión',
-            onPressed: () => _logout(context),
-          ),
-        ],
-      ),
+      extendBody: true,
       body: AppBackground(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Card(
-                elevation: 0,
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const AuthBrandHeader(),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Sesión iniciada correctamente',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Has accedido como:',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        email,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Más adelante aquí irá el shell principal de la aplicación con hogares, dispositivos, incidencias y perfil.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      FilledButton.icon(
-                        onPressed: () => _logout(context),
-                        icon: const Icon(Icons.logout),
-                        label: const Text('Cerrar sesión'),
-                      ),
-                    ],
-                  ),
-                ),
+        child: Column(
+          children: [
+            ShellTopBar(
+              title: title,
+              subtitle: subtitle,
+              onLogout: _logout,
+            ),
+            Expanded(
+              child: IndexedStack(
+                index: currentIndex,
+                children: _pages,
               ),
             ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            color: cs.surface.withValues(alpha: 0.92),
+            border: Border.all(
+              color: cs.outlineVariant.withValues(alpha: 0.7),
+            ),
+            boxShadow: [
+              BoxShadow(
+                blurRadius: 24,
+                offset: const Offset(0, 12),
+                color: Colors.black.withValues(alpha: 0.08),
+              ),
+            ],
+          ),
+          child: NavigationBar(
+            backgroundColor: Colors.transparent,
+            selectedIndex: currentIndex,
+            indicatorColor: cs.primary.withValues(alpha: 0.14),
+            labelBehavior:
+            NavigationDestinationLabelBehavior.onlyShowSelected,
+            onDestinationSelected: (index) {
+              setState(() => currentIndex = index);
+            },
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home_rounded),
+                label: 'Inicio',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.query_stats_outlined),
+                selectedIcon: Icon(Icons.query_stats_rounded),
+                label: 'Gráficas',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.devices_other_outlined),
+                selectedIcon: Icon(Icons.devices_other_rounded),
+                label: 'Dispositivos',
+              ),
+            ],
           ),
         ),
       ),

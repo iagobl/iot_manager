@@ -59,6 +59,10 @@ class ErrorMapper {
       return UnknownFailure(error.message);
     }
 
+    if (error is ValidationAppException) {
+      return ValidationFailure(error.message);
+    }
+
     return const UnknownFailure('Ha ocurrido un error inesperado.');
   }
 }

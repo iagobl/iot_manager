@@ -1,0 +1,370 @@
+import 'package:flutter/material.dart';
+
+import '../../../../core/constants/app_strings.dart';
+import '../../../../core/widgets/glass_card.dart';
+import '../../../../core/constants/home_strings.dart';
+import '../controllers/home_controller.dart';
+import '../widgets/home_summary_card.dart';
+import '../widgets/quick_stat_card.dart';
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => HomePageState();
+}
+
+class HomePageState extends State<HomePage> {
+  late final HomeController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = HomeController.create();
+    controller.addListener(onControllerChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.load();
+    });
+  }
+
+  void onControllerChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    controller.removeListener(onControllerChanged);
+    controller.dispose();
+    super.dispose();
+  }
+
+  String get welcomeName {
+    final name = controller.firstName.trim();
+    if (name.isNotEmpty) return name;
+    return 'de nuevo';
+  }
+
+  Future<void> showCreateHomeDialog() async {
+    final textController = TextEditingController();
+
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(HomeStrings.newHome),
+          content: TextField(
+            controller: textController,
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            decoration: const InputDecoration(
+              hintText: 'Ej. Casa principal',
+              labelText: HomeStrings.nameHome,
+            ),
+            onSubmitted: (_) => Navigator.of(context).pop(true),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text(AppStrings.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text(AppStrings.create),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (created != true) return;
+
+    final ok = await controller.createHome(textController.text);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok
+              ? HomeStrings.confirmationCreateHome
+              : (controller.errorMessage ?? HomeStrings.notConfirmationCreateHome),
+        ),
+      ),
+    );
+  }
+
+  Future<void> confirmDeleteHome({
+    required String homeId,
+    required String homeName,
+  }) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(HomeStrings.deleteHome),
+          content: Text(
+            '¿Quieres eliminar "$homeName"?\n\n'
+                'Los dispositivos seguirán existiendo, pero dejarán de estar asociados a este hogar.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text(AppStrings.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text(AppStrings.delete),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    final ok = await controller.deleteHome(homeId);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok
+              ? HomeStrings.confirmationDeleteHome
+              : (controller.errorMessage ?? HomeStrings.notConfirmationDeleteHome),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (controller.loading && controller.overview == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (controller.errorMessage != null && controller.overview == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: GlassCard(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline_rounded, size: 40),
+                const SizedBox(height: 14),
+                Text(
+                  controller.errorMessage!,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  onPressed: controller.load,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text(AppStrings.retry),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: controller.load,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 110),
+        children: [
+          GlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Bienvenido, $welcomeName',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  HomeStrings.descriptionHome,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          GridView.count(
+            crossAxisCount: MediaQuery.of(context).size.width > 700 ? 3 : 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.10,
+            children: [
+              QuickStatCard(
+                label: 'Hogares',
+                value: controller.totalHomes.toString(),
+                icon: Icons.home_work_outlined,
+              ),
+              QuickStatCard(
+                label: 'Dispositivos',
+                value: controller.totalDevices.toString(),
+                icon: Icons.devices_other_outlined,
+              ),
+              QuickStatCard(
+                label: 'Activos',
+                value: controller.activeDevices.toString(),
+                icon: Icons.bolt_rounded,
+              ),
+              QuickStatCard(
+                label: 'Consumo hoy',
+                value: '${controller.totalTodayWh.toStringAsFixed(0)} Wh',
+                icon: Icons.energy_savings_leaf_outlined,
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const Expanded(
+                child: _SectionHeader(
+                  title: 'Tus hogares',
+                  subtitle: '',
+                ),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.icon(
+                onPressed: controller.creatingHome ? null : showCreateHomeDialog,
+                icon: controller.creatingHome
+                    ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+                    : const Icon(Icons.add_home_outlined),
+                label: const Text(AppStrings.create),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (controller.homes.isEmpty)
+            _EmptyBlock(
+              title: HomeStrings.descriptionNewHome,
+              subtitle: HomeStrings.warningNewHome,
+              icon: Icons.home_outlined,
+              actionLabel: HomeStrings.newHome,
+              onAction: controller.creatingHome ? null : showCreateHomeDialog,
+            )
+          else
+            ...controller.homes.map(
+                  (home) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: HomeSummaryCard(
+                  name: home.name,
+                  subtitle: home.createdAt == null
+                      ? HomeStrings.createHomeRecently
+                      : 'Creado el ${home.createdAt!.day.toString().padLeft(2, '0')}/${home.createdAt!.month.toString().padLeft(2, '0')}/${home.createdAt!.year}',
+                  icon: Icons.house_siding_rounded,
+                  deleting: controller.deletingId == home.id,
+                  onDelete: controller.deletingId != null
+                      ? null
+                      : () => confirmDeleteHome(
+                    homeId: home.id,
+                    homeName: home.name,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _SectionHeader({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyBlock extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const _EmptyBlock({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return GlassCard(
+      child: Column(
+        children: [
+          Icon(icon, size: 42, color: cs.primary),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: onAction,
+              icon: const Icon(Icons.add_home_outlined),
+              label: Text(actionLabel!),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

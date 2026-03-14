@@ -22,3 +22,7 @@ class ServerFailure extends AppFailure {
 class UnknownFailure extends AppFailure {
   const UnknownFailure(super.message);
 }
+
+class ValidationFailure extends AppFailure {
+  const ValidationFailure(super.message);
+}

@@ -25,3 +25,7 @@ class ServerAppException extends AppException {
 class UnknownAppException extends AppException {
   const UnknownAppException(super.message);
 }
+
+class ValidationAppException extends AppException {
+  const ValidationAppException(super.message);
+}
