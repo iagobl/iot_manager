@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../constants/app_strings.dart';
-import '../constants/auth_strings.dart';
+import '../../../../core/constants/app_strings.dart';
+import '../../../../core/constants/auth_strings.dart';
 
-class AppBrandHeader extends StatelessWidget {
-  const AppBrandHeader({super.key});
+class AuthBrandHeader extends StatelessWidget {
+  const AuthBrandHeader({super.key});
 
   @override
   Widget build(BuildContext context) {

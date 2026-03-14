@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import '../../../../app/routes.dart';
 import '../../../../core/constants/auth_strings.dart';
 import '../../../../core/widgets/app_background.dart';
-import '../../../../core/widgets/app_brand_header.dart';
+import '../widgets/auth_brand_header.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/utils/validators.dart';
 
+import '../controllers/login_controller.dart';
 import '../widgets/auth_footer.dart';
 import '../widgets/auth_header.dart';
 
@@ -24,11 +25,26 @@ class LoginPageState extends State<LoginPage> {
   final email = TextEditingController();
   final pass = TextEditingController();
 
-  bool loading = false;
+  late final LoginController controller;
+
   bool hidePass = true;
 
   @override
+  void initState() {
+    super.initState();
+    controller = LoginController.create();
+    controller.addListener(onControllerChanged);
+  }
+
+  void onControllerChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  @override
   void dispose() {
+    controller.removeListener(onControllerChanged);
+    controller.dispose();
     email.dispose();
     pass.dispose();
     super.dispose();
@@ -38,14 +54,28 @@ class LoginPageState extends State<LoginPage> {
     FocusScope.of(context).unfocus();
 
     if (!(formKey.currentState?.validate() ?? false)) return;
-    setState(() => loading = true);
 
-    try {
-      //Aquí voy a llamar a lógica de llamar a backend para hacer login
+    final ok = await controller.login(
+      email: email.text,
+      password: pass.text,
+    );
 
+    if (!mounted) return;
+    if (ok) {
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        Routes.authGate, (_) => false,
+      );
+      return;
+    }
 
-    } finally {
-      if (mounted) {setState(() => loading = false);}
+    final message = controller.errorMessage;
+    if (message != null && message.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -61,7 +91,7 @@ class LoginPageState extends State<LoginPage> {
               child: Column(
                 children: [
                   const SizedBox(height: 8),
-                  const AppBrandHeader(),
+                  const AuthBrandHeader(),
                   const SizedBox(height: 18),
                   GlassCard(
                     child: Form(
@@ -91,15 +121,15 @@ class LoginPageState extends State<LoginPage> {
                               onPressed: () {
                                 setState(() => hidePass = !hidePass);
                               },
-                              icon: Icon(hidePass ? Icons.visibility
-                                  : Icons.visibility_off,
+                              icon: Icon(
+                                hidePass ? Icons.visibility : Icons.visibility_off,
                               ),
                             ),
                           ),
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: loading ? null : () {
+                              onPressed: controller.loading ? null : () {
                                 Navigator.of(context).pushNamed(
                                   Routes.forgotPassword,
                                 );
@@ -110,9 +140,9 @@ class LoginPageState extends State<LoginPage> {
                           const SizedBox(height: 6),
                           PrimaryButton(
                             text: AuthStrings.signIn,
-                            loading: loading,
+                            loading: controller.loading,
                             icon: Icons.login,
-                            onPressed: onLoginPressed,
+                            onPressed: controller.loading ? null : onLoginPressed,
                           ),
                           const SizedBox(height: 10),
                           AuthFooter(

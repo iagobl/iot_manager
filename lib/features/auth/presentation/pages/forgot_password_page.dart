@@ -6,6 +6,7 @@ import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/utils/validators.dart';
+import '../controllers/forgot_password_controller.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -18,10 +19,24 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final formKey = GlobalKey<FormState>();
   final emailCtrl = TextEditingController();
 
-  bool loading = false;
+  late final ForgotPasswordController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = ForgotPasswordController.create();
+    controller.addListener(onControllerChanged);
+  }
+
+  void onControllerChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
 
   @override
   void dispose() {
+    controller.removeListener(onControllerChanged);
+    controller.dispose();
     emailCtrl.dispose();
     super.dispose();
   }
@@ -30,15 +45,34 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     FocusScope.of(context).unfocus();
 
     if (!(formKey.currentState?.validate() ?? false)) return;
-    setState(() => loading = true);
 
-    try {
-      // Aquí voy a llamar a lógica de llamar a backend para enviar email de recuperación
+    final ok = await controller.sendRecoveryEmail(
+      email: emailCtrl.text,
+    );
 
+    if (!mounted) return;
 
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(AuthStrings.recoveryEmail),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
 
-    } finally {
-      if (mounted) {setState(() => loading = false);}
+      Navigator.of(context).pop();
+      return;
+    }
+
+    final message = controller.errorMessage;
+
+    if (message != null && message.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -95,9 +129,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       const SizedBox(height: 22),
                       PrimaryButton(
                         text: AuthStrings.sendRecoveryEmail,
-                        loading: loading,
+                        loading: controller.loading,
                         icon: Icons.mark_email_read,
-                        onPressed: onSendPressed,
+                        onPressed: controller.loading ? null : onSendPressed,
                       ),
                     ],
                   ),

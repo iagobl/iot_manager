@@ -24,9 +24,13 @@ class AuthStrings {
   static const recoverPasswordSubtitle =
       'Te enviaremos un email para restablecer tu contraseña.';
   static const sendRecoveryEmail = 'Enviar email';
+  static const recoveryEmail = 'Email enviado. Revisa tu correo.';
 
   static const acceptTerms =
       'He leído y acepto los términos y la política de privacidad';
+  static const terms = 'Debes aceptar los términos para continuar';
 
   static const loading = 'Cargando...';
+
+  static const createAcount = 'Cuenta creada correctamente';
 }

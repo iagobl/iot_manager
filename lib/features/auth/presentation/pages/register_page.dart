@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/routes.dart';
 import '../../../../core/widgets/app_background.dart';
-import '../../../../core/widgets/app_brand_header.dart';
+import '../widgets/auth_brand_header.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../core/constants/auth_strings.dart';
 
+import '../controllers/register_controller.dart';
 import '../widgets/auth_footer.dart';
 import '../widgets/auth_header.dart';
 
@@ -28,13 +29,28 @@ class _RegisterPageState extends State<RegisterPage> {
   final pass = TextEditingController();
   final confirm = TextEditingController();
 
-  bool loading = false;
+  late final RegisterController controller;
+
   bool hidePass = true;
   bool hideConfirm = true;
   bool acceptedTerms = false;
 
   @override
+  void initState() {
+    super.initState();
+    controller = RegisterController.create();
+    controller.addListener(onControllerChanged);
+  }
+
+  void onControllerChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  @override
   void dispose() {
+    controller.removeListener(onControllerChanged);
+    controller.dispose();
     firstName.dispose();
     lastName.dispose();
     email.dispose();
@@ -51,22 +67,45 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!acceptedTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Debes aceptar los términos para continuar.'),
+          content: Text(AuthStrings.terms),
           behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
 
-    setState(() => loading = true);
+    final ok = await controller.register(
+      firstName: firstName.text,
+      lastName: lastName.text,
+      email: email.text,
+      password: pass.text,
+    );
 
-    try {
-      // Aquí voy a llamar a lógica de llamar a backend para registrar al usuario
-      // Luego de registrar, navegaría a la pantalla principal o mostraría un mensaje de éxito
+    if (!mounted) return;
 
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(AuthStrings.createAcount),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
 
-    } finally {
-      if (mounted) {setState(() => loading = false);}
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        Routes.authGate, (_) => false,
+      );
+      return;
+    }
+
+    final message = controller.errorMessage;
+
+    if (message != null && message.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -82,7 +121,7 @@ class _RegisterPageState extends State<RegisterPage> {
               child: Column(
                 children: [
                   const SizedBox(height: 8),
-                  const AppBrandHeader(),
+                  const AuthBrandHeader(),
                   const SizedBox(height: 18),
                   GlassCard(
                     child: Form(
@@ -161,9 +200,9 @@ class _RegisterPageState extends State<RegisterPage> {
                           const SizedBox(height: 12),
                           PrimaryButton(
                             text: AuthStrings.signUp,
-                            loading: loading,
+                            loading: controller.loading,
                             icon: Icons.person_add,
-                            onPressed: onRegisterPressed,
+                            onPressed: controller.loading ? null : onRegisterPressed,
                           ),
                           const SizedBox(height: 10),
                           AuthFooter(

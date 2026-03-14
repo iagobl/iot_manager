@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../app/routes.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/widgets/app_background.dart';
-import '../../../core/widgets/app_brand_header.dart';
+import '../../auth/presentation/widgets/auth_brand_header.dart';
 
 class AppShell extends StatelessWidget {
   const AppShell({super.key});
@@ -46,7 +46,7 @@ class AppShell extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const AppBrandHeader(),
+                      const AuthBrandHeader(),
                       const SizedBox(height: 24),
                       Text(
                         'Sesión iniciada correctamente',
