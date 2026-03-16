@@ -33,4 +33,6 @@ class AuthStrings {
   static const loading = 'Cargando...';
 
   static const createAcount = 'Cuenta creada correctamente';
+
+  static const notAutenticated = 'No autenticado. Por favor, inicia sesión.';
 }

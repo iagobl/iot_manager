@@ -11,13 +11,9 @@ class DevicesRepositoryImpl implements DevicesRepository {
   @override
   Future<List<DeviceItem>> getUserDevices() async {
     try {
-      final raw = await remoteDatasource.getUserDevices();
-      return raw
-          .cast<Map<String, dynamic>>()
-          .map(DeviceItem.fromMap)
-          .toList();
-    } catch (e) {
-      throw ErrorMapper.mapFailure(e);
+      return await remoteDatasource.getUserDevices();
+    } catch (error) {
+      throw ErrorMapper.mapFailure(error);
     }
   }
 }

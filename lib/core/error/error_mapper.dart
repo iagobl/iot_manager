@@ -63,6 +63,14 @@ class ErrorMapper {
       return ValidationFailure(error.message);
     }
 
+    if (error is BluetoothAppException) {
+      return BluetoothFailure(error.message);
+    }
+
+    if (error is DeviceAppException) {
+      return DeviceFailure(error.message);
+    }
+
     return const UnknownFailure('Ha ocurrido un error inesperado.');
   }
 }
