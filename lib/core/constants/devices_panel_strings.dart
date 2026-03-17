@@ -26,4 +26,35 @@ class DevicesPanelStrings {
   static const temperature = 'Temperatura';
   static const energyToday = 'Energía hoy';
   static const hz = 'Hz';
+
+  static const notData = 'Sin datos';
+  static const excellent = 'Excelente';
+  static const good = 'Bueno';
+  static const regular = 'Regular';
+  static const bad = 'Malo';
+
+  static const asignedIP = 'IP asignada';
+  static const signalQuality = 'Calidad de señal';
+  static const wifiAddress = 'Red Wi-Fi';
+
+  static const firmware = 'Firmware';
+  static const firmwareVersion = 'Versión de firmware';
+  static const firmwareSystem = 'Firmware y sistema';
+  static const updateAvailable = 'Actualización disponible';
+  static const pedingUpdate = 'Actualización pendiente';
+  static const notUpdateAvailable = 'Sin actualización pendiente';
+  static const systemState = 'Estado del sistema';
+  static const timeActivate = 'Tiempo activo';
+  static const localIP = 'IP local';
+
+  static const recomendatedAction = 'Acción recomendada';
+  static const checkUpdate = 'Revisar actualización';
+  static const details = 'Detalle';
+  static const model = 'Modelo';
+  static const operative = 'Operativo';
+  static const macAddress = 'Dirección MAC';
+  static const generalState = 'Estado general';
+  static const normalOperation = 'Funcionamiento normal';
+  static const nedAttention = 'Requiere atención';
+
 }

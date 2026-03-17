@@ -85,6 +85,14 @@ class ShellyRpcClient {
     return call('Switch.GetStatus', params: {'id': id});
   }
 
+  Future<Map<String, dynamic>> getWifiStatus() async {
+    return call('Wifi.GetStatus');
+  }
+
+  Future<Map<String, dynamic>> getSystemStatus() async {
+    return call('Sys.GetStatus');
+  }
+
   Future<void> setSwitch({required bool on, int id = 0,}) async {
     await call('Switch.Set', params: {'id': id, 'on': on});
   }

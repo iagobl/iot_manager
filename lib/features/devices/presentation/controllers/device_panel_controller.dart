@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:iot_manager/core/constants/devices_panel_strings.dart';
 
 import 'package:iot_manager/core/error/error_mapper.dart';
 import 'package:iot_manager/core/iot/shelly/shelly_rpc_client.dart';
@@ -31,6 +32,18 @@ class DevicePanelController extends ChangeNotifier {
   double _energyTodayWh = 0;
   double _frequencyHz = 0;
 
+  String _deviceHost = '-';
+  String _deviceIp = '-';
+  String _macAddress = '-';
+  String _firmwareVersion = '-';
+  String _deviceModel = '-';
+  bool _hasPendingUpdate = false;
+  bool _needsReboot = false;
+
+  String _ssid = DevicesPanelStrings.notData;
+  int _rssi = 0;
+  int _uptimeSeconds = 0;
+
   Timer? pollTimer;
 
   bool get loading => _loading;
@@ -45,6 +58,47 @@ class DevicePanelController extends ChangeNotifier {
   double get energyTodayWh => _energyTodayWh;
   double get frequencyHz => _frequencyHz;
 
+  String get deviceHost => _deviceHost;
+  String get deviceIp => _deviceIp;
+  String get macAddress => _macAddress;
+  String get firmwareVersion => _firmwareVersion;
+  String get deviceModel => _deviceModel;
+  bool get hasPendingUpdate => _hasPendingUpdate;
+  bool get needsReboot => _needsReboot;
+
+  String get ssid => _ssid;
+  int get rssi => _rssi;
+  int get uptimeSeconds => _uptimeSeconds;
+
+  String get signalQuality {
+    if (_rssi == 0) return DevicesPanelStrings.notData;
+    if (_rssi >= -60) return DevicesPanelStrings.excellent;
+    if (_rssi >= -70) return DevicesPanelStrings.good;
+    if (_rssi >= -80) return DevicesPanelStrings.regular;
+    return DevicesPanelStrings.bad;
+  }
+
+  String get uptimeLabel {
+    if (_uptimeSeconds <= 0) return '-';
+
+    final totalMinutes = _uptimeSeconds ~/ 60;
+    final days = totalMinutes ~/ (24 * 60);
+    final hours = (totalMinutes % (24 * 60)) ~/ 60;
+    final minutes = totalMinutes % 60;
+
+    if (days > 0) {
+      if (hours > 0) return '${days}d ${hours}h';
+      return '${days}d';
+    }
+
+    if (hours > 0) {
+      if (minutes > 0) return '${hours}h ${minutes}min';
+      return '${hours}h';
+    }
+
+    return '${minutes}min';
+  }
+
   Future<void> initialize() async {
     await refresh();
     startPolling();
@@ -58,8 +112,14 @@ class DevicePanelController extends ChangeNotifier {
 
     try {
       final switchStatus = await rpcClient.getSwitchStatus();
+      final deviceInfo = await rpcClient.getDeviceInfo();
+      final wifiStatus = await rpcClient.getWifiStatus();
+      final systemStatus = await rpcClient.getSystemStatus();
 
       applySwitchStatus(switchStatus);
+      applyDeviceInfo(deviceInfo);
+      applyWifiStatus(wifiStatus);
+      applySystemStatus(systemStatus);
 
       if (_energyTodayWh <= 0) {
         _energyTodayWh = device.energyTodayWh;
@@ -105,8 +165,8 @@ class DevicePanelController extends ChangeNotifier {
 
   void startPolling() {
     pollTimer?.cancel();
-    pollTimer = Timer.periodic(const Duration(seconds: 5),
-          (_) => unawaited(refreshSilently())
+    pollTimer = Timer.periodic(
+      const Duration(seconds: 5), (_) => unawaited(refreshSilently()),
     );
   }
 
@@ -115,12 +175,27 @@ class DevicePanelController extends ChangeNotifier {
 
     try {
       final switchStatus = await rpcClient.getSwitchStatus();
-      applySwitchStatus(switchStatus);
+      final deviceInfo = await rpcClient.getDeviceInfo();
+      final wifiStatus = await rpcClient.getWifiStatus();
+      final systemStatus = await rpcClient.getSystemStatus();
 
-      if (_errorMessage != null) {_errorMessage = null;}
+      applySwitchStatus(switchStatus);
+      applyDeviceInfo(deviceInfo);
+      applyWifiStatus(wifiStatus);
+      applySystemStatus(systemStatus);
+
+      if (_errorMessage != null) {
+        _errorMessage = null;
+      }
 
       notifyListeners();
-    } catch (_) {}
+    } catch (error) {
+      final failure = ErrorMapper.mapFailure(error);
+      if (_errorMessage == null) {
+        _errorMessage = failure.message;
+        notifyListeners();
+      }
+    }
   }
 
   void applySwitchStatus(Map<String, dynamic> switchStatus) {
@@ -130,7 +205,8 @@ class DevicePanelController extends ChangeNotifier {
     _currentA = readDouble(switchStatus, const ['current']);
     _temperatureC = readTemperatureC(switchStatus);
 
-    final parsedEnergy = readDouble(switchStatus,
+    final parsedEnergy = readDouble(
+      switchStatus,
       const ['aenergy.total', 'energy.total', 'aenergy.by_minute'],
     );
     if (parsedEnergy > 0) {
@@ -138,6 +214,99 @@ class DevicePanelController extends ChangeNotifier {
     }
 
     _frequencyHz = readDouble(switchStatus, const ['freq', 'frequency']);
+  }
+
+  void applyDeviceInfo(Map<String, dynamic> deviceInfo) {
+    _deviceHost = device.identifier.trim().isEmpty ? '-' : device.identifier;
+
+    _deviceIp = readString(
+      deviceInfo,
+      const ['ip', 'ipv4', 'wifi.sta_ip', 'wifi.ip'],
+    );
+
+    _macAddress = readString(
+      deviceInfo,
+      const ['mac', 'mac_address'],
+    );
+
+    _firmwareVersion = readString(
+      deviceInfo,
+      const ['ver', 'version', 'fw_id', 'fw'],
+    );
+
+    _deviceModel = readString(
+      deviceInfo,
+      const ['model', 'name', 'type'],
+    );
+
+    _hasPendingUpdate = readBool(
+      deviceInfo,
+      const [
+        'update.available',
+        'update.has_update',
+        'updates.available',
+        'has_update',
+      ],
+    );
+
+    _needsReboot = readBool(
+      deviceInfo,
+      const [
+        'reboot_required',
+        'restart_required',
+        'update.needs_reboot',
+      ],
+    );
+  }
+
+  void applyWifiStatus(Map<String, dynamic> wifiStatus) {
+    final parsedSsid = readString(
+      wifiStatus,
+      const [
+        'sta.ssid',
+        'wifi.sta.ssid',
+        'ssid',
+      ],
+    );
+    _ssid = parsedSsid == '-' ? 'Sin datos' : parsedSsid;
+
+    final parsedRssi = readInt(
+      wifiStatus,
+      const [
+        'sta.rssi',
+        'wifi.sta.rssi',
+        'rssi',
+      ],
+    );
+    _rssi = parsedRssi;
+  }
+
+  void applySystemStatus(Map<String, dynamic> systemStatus) {
+    _uptimeSeconds = 0;
+
+    final uptime = readNestedValue(systemStatus, 'uptime');
+    if (uptime is num) {
+      _uptimeSeconds = uptime.toInt();
+      return;
+    }
+
+    final nestedUptime = readNestedValue(systemStatus, 'sys.uptime');
+    if (nestedUptime is num) {
+      _uptimeSeconds = nestedUptime.toInt();
+    }
+  }
+
+  String readString(Map<String, dynamic> source, List<String> keys) {
+    for (final key in keys) {
+      final value = readNestedValue(source, key);
+
+      if (value == null) continue;
+
+      final text = value.toString().trim();
+      if (text.isNotEmpty) return text;
+    }
+
+    return '-';
   }
 
   bool readBool(Map<String, dynamic> source, List<String> keys) {
@@ -175,6 +344,21 @@ class DevicePanelController extends ChangeNotifier {
     return 0;
   }
 
+  int readInt(Map<String, dynamic> source, List<String> keys) {
+    for (final key in keys) {
+      final value = readNestedValue(source, key);
+
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+
+      if (value is String) {
+        final parsed = int.tryParse(value.trim());
+        if (parsed != null) return parsed;
+      }
+    }
+    return 0;
+  }
+
   double readTemperatureC(Map<String, dynamic> source) {
     final nested = readNestedValue(source, 'temperature.tC');
     if (nested is num) return nested.toDouble();
@@ -206,7 +390,7 @@ class DevicePanelController extends ChangeNotifier {
 
   void clearError({bool notify = true}) {
     _errorMessage = null;
-    if (notify) {notifyListeners();}
+    if (notify) notifyListeners();
   }
 
   @override

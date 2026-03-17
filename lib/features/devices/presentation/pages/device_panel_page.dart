@@ -3,12 +3,13 @@ import 'package:iot_manager/core/constants/devices_panel_strings.dart';
 
 import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
 import 'package:iot_manager/features/devices/presentation/controllers/device_panel_controller.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/sections/device_info_section.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/sections/device_power_panel.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_detail_sidebar.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_metric_card.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_panel_styles.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_panel_top_bar.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_placeholder_section.dart';
-import 'package:iot_manager/features/devices/presentation/widgets/sections/device_power_panel.dart';
 
 enum DevicePanelSection {
   overview,
@@ -114,6 +115,24 @@ class DevicePanelPageState extends State<DevicePanelPage> {
   Widget buildSection(BuildContext context) {
     if (selectedSection == DevicePanelSection.overview) {
       return buildOverview(context);
+    }
+
+    if (selectedSection == DevicePanelSection.info) {
+      return DeviceInfoSection(
+        host: controller.deviceHost,
+        ipAddress: controller.deviceIp,
+        macAddress: controller.macAddress,
+        firmwareVersion: controller.firmwareVersion,
+        model: controller.deviceModel,
+        deviceType: widget.device.deviceType,
+        hasPendingUpdate: controller.hasPendingUpdate,
+        needsReboot: controller.needsReboot,
+        errorMessage: controller.errorMessage,
+        ssid: controller.ssid,
+        rssi: controller.rssi,
+        signalQuality: controller.signalQuality,
+        uptimeLabel: controller.uptimeLabel,
+      );
     }
 
     return DevicePlaceholderSection(section: selectedSection);

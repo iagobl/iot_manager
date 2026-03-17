@@ -11,4 +11,14 @@ class AppStrings {
   static const add = 'Añadir';
   static const exit = 'Cerrar';
   static const ipHost = 'IP o Host';
+  static const none = 'Ninguna';
+  static const yes = 'Sí';
+  static const no = 'No';
+
+  static const reboot = 'Reiniciar dispositivo';
+  static const necesaryReboot = 'Reinicio requerido';
+  static const recomendedReboot = 'Reinicio recomendado';
+
+  static const offline = 'Sin conexión';
+  static const connected = 'Conectado';
 }
