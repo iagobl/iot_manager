@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../../domain/entities/device_item.dart';
+import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
 
 class DeviceCard extends StatelessWidget {
-  final DeviceItem device;
-  final ValueChanged<bool>? onToggle;
 
   const DeviceCard({
     super.key,
     required this.device,
     this.onToggle,
   });
+  final DeviceItem device;
+  final ValueChanged<bool>? onToggle;
 
   @override
   Widget build(BuildContext context) {

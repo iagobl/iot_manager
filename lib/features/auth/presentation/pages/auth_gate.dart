@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:iot_manager/app/routes.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-import '../../../../app/routes.dart';
 
 final supabase = Supabase.instance.client;
 

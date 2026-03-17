@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 
 class PrimaryButton extends StatelessWidget {
-  final String text;
-  final bool loading;
-  final VoidCallback? onPressed;
-  final IconData? icon;
 
   const PrimaryButton({
     super.key,
@@ -13,6 +9,10 @@ class PrimaryButton extends StatelessWidget {
     this.loading = false,
     this.icon,
   });
+  final String text;
+  final bool loading;
+  final VoidCallback? onPressed;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {

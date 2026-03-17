@@ -1,10 +1,10 @@
-import '../entities/home_overview.dart';
-import '../repositories/home_repository.dart';
+import 'package:iot_manager/features/home/domain/entities/home_overview.dart';
+import 'package:iot_manager/features/home/domain/repositories/home_repository.dart';
 
 class GetHomeOverview {
-  final HomeRepository repository;
 
   GetHomeOverview(this.repository);
+  final HomeRepository repository;
 
   Future<HomeOverview> call() {
     return repository.getOverview();

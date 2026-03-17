@@ -1,14 +1,15 @@
-import '../../../../core/error/error_mapper.dart';
-import '../../../devices/domain/entities/device_item.dart';
-import '../../domain/entities/home_overview.dart';
-import '../../domain/entities/home_summary.dart';
-import '../../domain/repositories/home_repository.dart';
-import '../datasources/home_remote_datasource.dart';
+import 'package:iot_manager/core/error/error_mapper.dart';
+
+import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
+import 'package:iot_manager/features/home/data/datasources/home_remote_datasource.dart';
+import 'package:iot_manager/features/home/domain/entities/home_overview.dart';
+import 'package:iot_manager/features/home/domain/entities/home_summary.dart';
+import 'package:iot_manager/features/home/domain/repositories/home_repository.dart';
 
 class HomeRepositoryImpl implements HomeRepository {
-  final HomeRemoteDatasource remoteDatasource;
 
   HomeRepositoryImpl(this.remoteDatasource);
+  final HomeRemoteDatasource remoteDatasource;
 
   @override
   Future<HomeOverview> getOverview() async {

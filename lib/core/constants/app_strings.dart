@@ -10,5 +10,5 @@ class AppStrings {
   static const name = 'Nombre';
   static const add = 'Añadir';
   static const exit = 'Cerrar';
-  static const IPHOST = 'IP o Host';
+  static const ipHost = 'IP o Host';
 }

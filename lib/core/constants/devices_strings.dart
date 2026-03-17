@@ -1,5 +1,5 @@
 class DevicesStrings {
-  static const SSID = 'SSID';
+  static const ssid = 'SSID';
   static const password = 'Contraseña Wi-Fi';
   static const devices = 'Dispositivos';
   static const active = 'Activos';
@@ -10,7 +10,7 @@ class DevicesStrings {
   static const notBluetoothActivated = 'El Bluetooth no está activado. Por favor, actívalo para descubrir dispositivos';
   static const selectDevice = 'Selecciona primero un dispositivo';
 
-  static const MACDevice = 'Obteniendo dirección MAC del dispositivo...';
+  static const macDevice = 'Obteniendo dirección MAC del dispositivo...';
   static const credentialsDevices = 'Enviando credenciales Wi-Fi al dispositivo...';
   static const rebootDevice = 'Reiniciando dispositivo...';
   static const runDevice = 'Esperando a que el dispositivo se conecte a la red...';

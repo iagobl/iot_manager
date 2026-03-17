@@ -1,8 +1,4 @@
 class DiscoveredIotDevice {
-  final String ip;
-  final String name;
-  final String type;
-  final Map<String, dynamic> deviceInfo;
 
   const DiscoveredIotDevice({
     required this.ip,
@@ -10,4 +6,8 @@ class DiscoveredIotDevice {
     required this.type,
     required this.deviceInfo,
   });
+  final String ip;
+  final String name;
+  final String type;
+  final Map<String, dynamic> deviceInfo;
 }

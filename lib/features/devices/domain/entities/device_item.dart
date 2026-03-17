@@ -1,14 +1,4 @@
 class DeviceItem {
-  final String id;
-  final String name;
-  final String deviceType;
-  final String protocol;
-  final String identifier;
-  final bool isActive;
-  final String ownerId;
-  final String? homeId;
-  final String? roomId;
-  final double energyTodayWh;
 
   const DeviceItem({
     required this.id,
@@ -37,6 +27,16 @@ class DeviceItem {
       energyTodayWh: (map['energy_today_wh'] ?? 0).toDouble(),
     );
   }
+  final String id;
+  final String name;
+  final String deviceType;
+  final String protocol;
+  final String identifier;
+  final bool isActive;
+  final String ownerId;
+  final String? homeId;
+  final String? roomId;
+  final double energyTodayWh;
 
   Map<String, dynamic> toMap() {
     return {

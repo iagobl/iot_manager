@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'routes.dart';
-import 'theme.dart';
+import 'package:iot_manager/app/routes.dart';
+import 'package:iot_manager/app/theme.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});

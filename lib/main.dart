@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:iot_manager/app/app.dart';
+import 'package:iot_manager/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'app/app.dart';
-import 'supabase_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

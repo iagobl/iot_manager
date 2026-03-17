@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 class AppBackground extends StatelessWidget {
-  final Widget child;
 
   const AppBackground({
     super.key,
     required this.child,
   });
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
@@ -55,13 +55,13 @@ class AppBackground extends StatelessWidget {
 }
 
 class _SoftCircle extends StatelessWidget {
-  final double size;
-  final Color color;
 
   const _SoftCircle({
     required this.size,
     required this.color,
   });
+  final double size;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {

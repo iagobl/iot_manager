@@ -1,21 +1,13 @@
 import 'package:flutter/foundation.dart';
+
+import 'package:iot_manager/core/error/app_failure.dart';
+
+import 'package:iot_manager/features/auth/data/datasources/auth_remote_datasource.dart';
+import 'package:iot_manager/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:iot_manager/features/auth/domain/usecases/sign_up_create_profile.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../../core/error/app_failure.dart';
-import '../../data/datasources/auth_remote_datasource.dart';
-import '../../data/repositories/auth_repository_impl.dart';
-import '../../domain/usecases/sign_up_create_profile.dart';
-
 class RegisterController extends ChangeNotifier {
-  final SignUpCreateProfile signUpAndCreateProfile;
-
-  RegisterController(this.signUpAndCreateProfile);
-
-  bool isLoading = false;
-  String? errorMessages;
-
-  bool get loading => isLoading;
-  String? get errorMessage => errorMessages;
 
   factory RegisterController.create() {
     final client = Supabase.instance.client;
@@ -25,6 +17,15 @@ class RegisterController extends ChangeNotifier {
 
     return RegisterController(useCase);
   }
+
+  RegisterController(this.signUpAndCreateProfile);
+  final SignUpCreateProfile signUpAndCreateProfile;
+
+  bool isLoading = false;
+  String? errorMessages;
+
+  bool get loading => isLoading;
+  String? get errorMessage => errorMessages;
 
   Future<bool> register({
     required String firstName,

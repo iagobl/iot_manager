@@ -1,43 +1,44 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_strings.dart';
-import '../../../../core/constants/devices_strings.dart';
-import '../../../../core/iot/models/discovered_iot_device.dart';
-import '../controllers/devices_controller.dart';
-import '../widgets/device_card.dart';
-import 'shelly_ble_provision_page.dart';
+import 'package:iot_manager/core/constants/app_strings.dart';
+import 'package:iot_manager/core/constants/devices_strings.dart';
+import 'package:iot_manager/core/iot/models/discovered_iot_device.dart';
+
+import 'package:iot_manager/features/devices/presentation/controllers/devices_controller.dart';
+import 'package:iot_manager/features/devices/presentation/pages/shelly_ble_provision_page.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/device_card.dart';
 
 class DevicesPage extends StatefulWidget {
   const DevicesPage({super.key});
 
   @override
-  State<DevicesPage> createState() => _DevicesPageState();
+  State<DevicesPage> createState() => DevicesPageState();
 }
 
-class _DevicesPageState extends State<DevicesPage> {
+class DevicesPageState extends State<DevicesPage> {
   late final DevicesController controller;
 
   @override
   void initState() {
     super.initState();
     controller = DevicesController.create();
-    controller.addListener(_onControllerChanged);
+    controller.addListener(onControllerChanged);
     controller.load();
   }
 
-  void _onControllerChanged() {
+  void onControllerChanged() {
     if (!mounted) return;
     setState(() {});
   }
 
   @override
   void dispose() {
-    controller.removeListener(_onControllerChanged);
+    controller.removeListener(onControllerChanged);
     controller.dispose();
     super.dispose();
   }
 
-  Future<void> _openAddOptions() async {
+  Future<void> openAddOptions() async {
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -54,7 +55,7 @@ class _DevicesPageState extends State<DevicesPage> {
                   subtitle: const Text(DevicesStrings.configurationBluetoothSubtitle,),
                   onTap: () async {
                     Navigator.of(bottomSheetContext).pop();
-                    await _openBleProvisionFlow();
+                    await openBleProvisionFlow();
                   },
                 ),
                 ListTile(
@@ -63,7 +64,7 @@ class _DevicesPageState extends State<DevicesPage> {
                   subtitle: const Text(DevicesStrings.scanningLanSubtitle,),
                   onTap: () async {
                     Navigator.of(bottomSheetContext).pop();
-                    await _scanNetwork();
+                    await scanNetwork();
                   },
                 ),
                 ListTile(
@@ -83,7 +84,7 @@ class _DevicesPageState extends State<DevicesPage> {
     );
   }
 
-  Future<void> _openBleProvisionFlow() async {
+  Future<void> openBleProvisionFlow() async {
     final result = await Navigator.of(context).push<ShellyBleProvisionResult>(
       MaterialPageRoute(
         builder: (_) => const ShellyBleProvisionPage(),
@@ -94,7 +95,7 @@ class _DevicesPageState extends State<DevicesPage> {
 
     final model = (result.deviceInfo['model'] ?? '').toString().trim();
     final suggestedName = model.isNotEmpty ? model : 'Shelly';
-    final type = _inferTypeFromModel(model);
+    final type = inferTypeFromModel(model);
 
     await controller.addManualDevice(
       name: suggestedName,
@@ -102,10 +103,10 @@ class _DevicesPageState extends State<DevicesPage> {
       identifier: result.ip,
     );
 
-    _showControllerMessageIfNeeded(successMessage: DevicesStrings.addDeviceSucesful,);
+    showControllerMessageIfNeeded(successMessage: DevicesStrings.addDeviceSucesful,);
   }
 
-  String _inferTypeFromModel(String model) {
+  String inferTypeFromModel(String model) {
     final raw = model.toLowerCase();
     if (raw.contains('bulb') ||
         raw.contains('duo') ||
@@ -134,12 +135,13 @@ class _DevicesPageState extends State<DevicesPage> {
 
               if (name.isEmpty || identifier.isEmpty) {
                 ScaffoldMessenger.of(dialogContext).showSnackBar(
-                  const SnackBar(
-                    content: Text(DevicesStrings.completeConfiguration),
-                  ),
+                  const SnackBar(content: Text(DevicesStrings.completeConfiguration))
                 );
                 return;
               }
+
+              final navigator = Navigator.of(dialogContext);
+              final messenger = ScaffoldMessenger.of(this.context);
 
               setLocalState(() => saving = true);
 
@@ -154,16 +156,12 @@ class _DevicesPageState extends State<DevicesPage> {
               setLocalState(() => saving = false);
 
               if (controller.errorMessage == null) {
-                Navigator.of(dialogContext).pop();
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  const SnackBar(
-                    content: Text(DevicesStrings.addDeviceSucesful),
-                  ),
+                navigator.pop();
+                messenger.showSnackBar(
+                  const SnackBar(content: Text(DevicesStrings.addDeviceSucesful))
                 );
               } else {
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  SnackBar(content: Text(controller.errorMessage!)),
-                );
+                messenger.showSnackBar(SnackBar(content: Text(controller.errorMessage!)));
               }
             }
 
@@ -182,7 +180,7 @@ class _DevicesPageState extends State<DevicesPage> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: selectedType,
+                      initialValue: selectedType,
                       decoration: const InputDecoration(
                         labelText: DevicesStrings.tipesDevices,
                       ),
@@ -205,7 +203,7 @@ class _DevicesPageState extends State<DevicesPage> {
                     TextField(
                       controller: identifierController,
                       decoration: const InputDecoration(
-                        labelText: AppStrings.IPHOST,
+                        labelText: AppStrings.ipHost,
                         hintText: DevicesStrings.ejIP,
                       ),
                     ),
@@ -240,19 +238,19 @@ class _DevicesPageState extends State<DevicesPage> {
     identifierController.dispose();
   }
 
-  Future<void> _scanNetwork() async {
+  Future<void> scanNetwork() async {
     await controller.discoverDevicesInLan();
 
     if (!mounted) return;
 
     if (controller.scannedDevices.isNotEmpty) {
-      await _showDiscoveredDevicesDialog(controller.scannedDevices);
+      await showDiscoveredDevicesDialog(controller.scannedDevices);
     } else {
-      _showControllerMessageIfNeeded();
+      showControllerMessageIfNeeded();
     }
   }
 
-  Future<void> _showDiscoveredDevicesDialog(
+  Future<void> showDiscoveredDevicesDialog(
       List<DiscoveredIotDevice> devices,
       ) async {
     await showDialog<void>(
@@ -279,6 +277,9 @@ class _DevicesPageState extends State<DevicesPage> {
                   subtitle: Text(device.ip),
                   trailing: TextButton(
                     onPressed: () async {
+                      final navigator = Navigator.of(dialogContext);
+                      final messenger = ScaffoldMessenger.of(context);
+
                       await controller.addDiscoveredDevice(
                         name: device.name,
                         deviceType: device.type,
@@ -288,16 +289,12 @@ class _DevicesPageState extends State<DevicesPage> {
                       if (!mounted) return;
 
                       if (controller.errorMessage == null) {
-                        Navigator.of(dialogContext).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(DevicesStrings.addDeviceSucesful),
-                          ),
+                        navigator.pop();
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text(DevicesStrings.addDeviceSucesful))
                         );
                       } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(controller.errorMessage!)),
-                        );
+                        messenger.showSnackBar(SnackBar(content: Text(controller.errorMessage!)));
                       }
                     },
                     child: const Text(AppStrings.add),
@@ -317,7 +314,7 @@ class _DevicesPageState extends State<DevicesPage> {
     );
   }
 
-  void _showControllerMessageIfNeeded({String? successMessage}) {
+  void showControllerMessageIfNeeded({String? successMessage}) {
     if (!mounted) return;
 
     if (controller.errorMessage != null && controller.errorMessage!.isNotEmpty) {
@@ -343,7 +340,7 @@ class _DevicesPageState extends State<DevicesPage> {
         child: _buildBody(),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: controller.loading ? null : _openAddOptions,
+        onPressed: controller.loading ? null : openAddOptions,
         icon: const Icon(Icons.add_rounded),
         label: const Text(AppStrings.add),
       ),
@@ -390,7 +387,7 @@ class _DevicesPageState extends State<DevicesPage> {
                 controller.devices[index],
                 value,
               );
-              _showControllerMessageIfNeeded();
+              showControllerMessageIfNeeded();
             },
           ),
         ),

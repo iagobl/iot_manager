@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../app/routes.dart';
-import '../../../core/widgets/app_background.dart';
-import '../../analytics/presentation/pages/analytics_page.dart';
-import '../../devices/presentation/pages/devices_page.dart';
-import '../../home/presentation/pages/home_page.dart';
-import 'widgets/shell_top_bar.dart';
+import 'package:iot_manager/app/routes.dart';
+import 'package:iot_manager/core/widgets/app_background.dart';
+
+import 'package:iot_manager/features/analytics/presentation/pages/analytics_page.dart';
+import 'package:iot_manager/features/app_shell/presentation/widgets/shell_top_bar.dart';
+import 'package:iot_manager/features/devices/presentation/pages/devices_page.dart';
+import 'package:iot_manager/features/home/presentation/pages/home_page.dart';
+
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});

@@ -1,14 +1,14 @@
 import 'dart:async';
 
+import 'package:iot_manager/core/error/app_exception.dart';
+import 'package:iot_manager/core/error/error_mapper.dart';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../../core/error/app_exception.dart';
-import '../../../../core/error/error_mapper.dart';
-
 class AuthRemoteDatasource {
-  final SupabaseClient _client;
 
   AuthRemoteDatasource(this._client);
+  final SupabaseClient _client;
 
   Future<void> signIn({
     required String email,

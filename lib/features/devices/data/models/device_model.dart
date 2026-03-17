@@ -1,4 +1,4 @@
-import '../../domain/entities/device_item.dart';
+import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
 
 class DeviceModel extends DeviceItem {
   DeviceModel({
@@ -29,6 +29,7 @@ class DeviceModel extends DeviceItem {
     );
   }
 
+  @override
   Map<String, dynamic> toMap() {
     return {
       'id': id,

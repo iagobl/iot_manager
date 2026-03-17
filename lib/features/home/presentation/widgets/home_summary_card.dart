@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/home_strings.dart';
-import '../../../../core/widgets/glass_card.dart';
+import 'package:iot_manager/core/constants/home_strings.dart';
+import 'package:iot_manager/core/widgets/glass_card.dart';
 
 class HomeSummaryCard extends StatelessWidget {
-  final String name;
-  final String subtitle;
-  final IconData icon;
-  final VoidCallback? onDelete;
-  final bool deleting;
 
   const HomeSummaryCard({
     super.key,
@@ -18,6 +13,11 @@ class HomeSummaryCard extends StatelessWidget {
     this.onDelete,
     this.deleting = false,
   });
+  final String name;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback? onDelete;
+  final bool deleting;
 
   @override
   Widget build(BuildContext context) {

@@ -1,9 +1,9 @@
-import '../repositories/home_repository.dart';
+import 'package:iot_manager/features/home/domain/repositories/home_repository.dart';
 
 class CreateHome {
-  final HomeRepository repository;
 
   CreateHome(this.repository);
+  final HomeRepository repository;
 
   Future<void> call({required String name,}) {
     return repository.createHome(name: name);

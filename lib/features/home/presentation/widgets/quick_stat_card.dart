@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/widgets/glass_card.dart';
+import 'package:iot_manager/core/widgets/glass_card.dart';
 
 class QuickStatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
 
   const QuickStatCard({
     super.key,
@@ -13,6 +10,9 @@ class QuickStatCard extends StatelessWidget {
     required this.value,
     required this.icon,
   });
+  final String label;
+  final String value;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {

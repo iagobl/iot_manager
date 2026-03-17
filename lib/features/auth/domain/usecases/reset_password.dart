@@ -1,9 +1,9 @@
-import '../repositories/auth_repository.dart';
+import 'package:iot_manager/features/auth/domain/repositories/auth_repository.dart';
 
 class ResetPassword {
-  final AuthRepository repository;
 
   ResetPassword(this.repository);
+  final AuthRepository repository;
 
   Future<void> call(String email) {
     return repository.resetPassword(email);

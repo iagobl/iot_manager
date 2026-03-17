@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 
 class GlassCard extends StatelessWidget {
-  final Widget child;
-  final EdgeInsetsGeometry padding;
-  final double borderRadius;
-  final VoidCallback? onTap;
 
   const GlassCard({
     super.key,
@@ -13,6 +9,10 @@ class GlassCard extends StatelessWidget {
     this.borderRadius = 24,
     this.onTap,
   });
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final double borderRadius;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

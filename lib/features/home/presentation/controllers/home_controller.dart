@@ -1,23 +1,41 @@
 import 'package:flutter/foundation.dart';
+
+import 'package:iot_manager/core/constants/home_strings.dart';
+import 'package:iot_manager/core/error/app_failure.dart';
+
+import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
+import 'package:iot_manager/features/home/data/datasources/home_remote_datasource.dart';
+import 'package:iot_manager/features/home/data/repositories/home_repository_impl.dart';
+import 'package:iot_manager/features/home/domain/entities/home_overview.dart';
+import 'package:iot_manager/features/home/domain/entities/home_summary.dart';
+import 'package:iot_manager/features/home/domain/usecases/create_home.dart';
+import 'package:iot_manager/features/home/domain/usecases/delete_home.dart';
+import 'package:iot_manager/features/home/domain/usecases/get_home_overview.dart';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../../core/constants/home_strings.dart';
-import '../../../../core/error/app_failure.dart';
-import '../../../devices/domain/entities/device_item.dart';
-import '../../data/datasources/home_remote_datasource.dart';
-import '../../data/repositories/home_repository_impl.dart';
-import '../../domain/entities/home_overview.dart';
-import '../../domain/entities/home_summary.dart';
-import '../../domain/usecases/create_home.dart';
-import '../../domain/usecases/delete_home.dart';
-import '../../domain/usecases/get_home_overview.dart';
-
 class HomeController extends ChangeNotifier {
+
+  HomeController(this.getHomeOverview, this.createHomeUseCase, this.deleteHomeUseCase,);
+
+  factory HomeController.create() {
+    final client = Supabase.instance.client;
+    final datasource = HomeRemoteDatasource(client);
+    final repository = HomeRepositoryImpl(datasource);
+
+    final overviewUseCase = GetHomeOverview(repository);
+    final createUseCase = CreateHome(repository);
+    final deleteUseCase = DeleteHome(repository);
+
+    return HomeController(
+      overviewUseCase,
+      createUseCase,
+      deleteUseCase,
+    );
+  }
   final GetHomeOverview getHomeOverview;
   final CreateHome createHomeUseCase;
   final DeleteHome deleteHomeUseCase;
-
-  HomeController(this.getHomeOverview, this.createHomeUseCase, this.deleteHomeUseCase,);
 
   bool isLoading = false;
   bool isCreatingHome = false;
@@ -37,22 +55,6 @@ class HomeController extends ChangeNotifier {
   int get totalDevices => overview?.totalDevices ?? 0;
   int get activeDevices => overview?.activeDevices ?? 0;
   double get totalTodayWh => overview?.totalTodayWh ?? 0;
-
-  factory HomeController.create() {
-    final client = Supabase.instance.client;
-    final datasource = HomeRemoteDatasource(client);
-    final repository = HomeRepositoryImpl(datasource);
-
-    final overviewUseCase = GetHomeOverview(repository);
-    final createUseCase = CreateHome(repository);
-    final deleteUseCase = DeleteHome(repository);
-
-    return HomeController(
-      overviewUseCase,
-      createUseCase,
-      deleteUseCase,
-    );
-  }
 
   Future<void> load() async {
     setLoading(true);

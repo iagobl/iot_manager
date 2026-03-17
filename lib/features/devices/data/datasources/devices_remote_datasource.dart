@@ -1,10 +1,11 @@
 import 'package:iot_manager/core/constants/auth_strings.dart';
 import 'package:iot_manager/core/constants/devices_strings.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:iot_manager/core/error/app_exception.dart';
+import 'package:iot_manager/core/error/error_mapper.dart';
 
-import '../../../../core/error/app_exception.dart';
-import '../../../../core/error/error_mapper.dart';
-import '../../domain/entities/device_item.dart';
+import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
+
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DevicesRemoteDatasource {
   final SupabaseClient _client = Supabase.instance.client;

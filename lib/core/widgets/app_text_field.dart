@@ -1,13 +1,6 @@
 import 'package:flutter/material.dart';
 
 class AppTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String label;
-  final TextInputType keyboardType;
-  final bool obscureText;
-  final String? Function(String?)? validator;
-  final Widget? suffixIcon;
-  final TextInputAction textInputAction;
 
   const AppTextField({
     super.key,
@@ -19,6 +12,13 @@ class AppTextField extends StatelessWidget {
     this.suffixIcon,
     this.textInputAction = TextInputAction.next,
   });
+  final TextEditingController controller;
+  final String label;
+  final TextInputType keyboardType;
+  final bool obscureText;
+  final String? Function(String?)? validator;
+  final Widget? suffixIcon;
+  final TextInputAction textInputAction;
 
   @override
   Widget build(BuildContext context) {

@@ -1,14 +1,14 @@
 import 'dart:async';
 
+import 'package:iot_manager/core/error/app_exception.dart';
+import 'package:iot_manager/core/error/error_mapper.dart';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../../core/error/app_exception.dart';
-import '../../../../core/error/error_mapper.dart';
-
 class HomeRemoteDatasource {
-  final SupabaseClient _client;
 
   HomeRemoteDatasource(this._client);
+  final SupabaseClient _client;
 
   Future<Map<String, dynamic>> getOverview() async {
     try {

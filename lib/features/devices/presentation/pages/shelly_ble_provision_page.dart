@@ -2,75 +2,75 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:iot_manager/core/constants/iot_strings.dart';
 
-import '../../../../core/constants/devices_strings.dart';
-import '../../../../core/iot/ble/ble_permissions.dart';
-import '../../../../core/iot/shelly/shelly_ble_rpc_client.dart';
-import '../../../../core/iot/shelly/shelly_lan_discovery.dart';
-import '../../../../core/iot/wifi/wifi_info_service.dart';
+import 'package:iot_manager/core/constants/devices_strings.dart';
+import 'package:iot_manager/core/constants/iot_strings.dart';
+import 'package:iot_manager/core/iot/ble/ble_permissions.dart';
+import 'package:iot_manager/core/iot/shelly/shelly_ble_rpc_client.dart';
+import 'package:iot_manager/core/iot/shelly/shelly_lan_discovery.dart';
+import 'package:iot_manager/core/iot/wifi/wifi_info_service.dart';
 
 class ShellyBleProvisionResult {
-  final String ip;
-  final Map<String, dynamic> deviceInfo;
 
   ShellyBleProvisionResult({
     required this.ip,
     required this.deviceInfo,
   });
+  final String ip;
+  final Map<String, dynamic> deviceInfo;
 }
 
 class ShellyBleProvisionPage extends StatefulWidget {
   const ShellyBleProvisionPage({super.key});
 
   @override
-  State<ShellyBleProvisionPage> createState() => _ShellyBleProvisionPageState();
+  State<ShellyBleProvisionPage> createState() => ShellyBleProvisionPageState();
 }
 
-class _ShellyBleProvisionPageState extends State<ShellyBleProvisionPage> {
-  final _ssidCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
+class ShellyBleProvisionPageState extends State<ShellyBleProvisionPage> {
+  final ssidCtrl = TextEditingController();
+  final passCtrl = TextEditingController();
 
-  bool _scanning = false;
-  bool _provisioning = false;
-  String _status = '';
+  bool scanning = false;
+  bool provisioning = false;
+  String status = '';
 
-  ScanResult? _selected;
-  StreamSubscription<bool>? _scanSub;
-  StreamSubscription<List<ScanResult>>? _scanResultsSub;
-  List<ScanResult> _scanResults = [];
+  ScanResult? selected;
+  StreamSubscription<bool>? scanSub;
+  StreamSubscription<List<ScanResult>>? scanResultsSub;
+  List<ScanResult> scanResults = [];
 
   @override
   void initState() {
     super.initState();
-    _prefillSsid();
+    prefillSsid();
   }
 
   @override
   void dispose() {
-    _ssidCtrl.dispose();
-    _passCtrl.dispose();
-    _scanSub?.cancel();
-    _scanResultsSub?.cancel();
+    ssidCtrl.dispose();
+    passCtrl.dispose();
+    scanSub?.cancel();
+    scanResultsSub?.cancel();
     super.dispose();
   }
 
-  Future<void> _prefillSsid() async {
+  Future<void> prefillSsid() async {
     final wifi = WifiInfoService();
     final ssid = await wifi.getCurrentSsid();
     if (!mounted || ssid == null || ssid.isEmpty) return;
-    _ssidCtrl.text = ssid;
+    ssidCtrl.text = ssid;
   }
 
-  bool _looksLikeShelly(ScanResult r) {
-    final name = _displayName(r).toLowerCase();
+  bool looksLikeShelly(ScanResult r) {
+    final name = displayName(r).toLowerCase();
     return name.contains('addshelly') || name.contains('shelly');
   }
 
-  List<ScanResult> _filterAndDedup(List<ScanResult> results) {
+  List<ScanResult> filterAndDedup(List<ScanResult> results) {
     final byId = <String, ScanResult>{};
     for (final r in results) {
-      if (!_looksLikeShelly(r)) continue;
+      if (!looksLikeShelly(r)) continue;
       final existing = byId[r.device.remoteId.str];
       if (existing == null || r.rssi > existing.rssi) {
         byId[r.device.remoteId.str] = r;
@@ -81,12 +81,12 @@ class _ShellyBleProvisionPageState extends State<ShellyBleProvisionPage> {
     return list;
   }
 
-  Future<void> _startScan() async {
+  Future<void> startScan() async {
     setState(() {
-      _selected = null;
-      _scanning = true;
-      _status = '';
-      _scanResults = [];
+      selected = null;
+      scanning = true;
+      status = '';
+      scanResults = [];
     });
 
     try {
@@ -96,9 +96,9 @@ class _ShellyBleProvisionPageState extends State<ShellyBleProvisionPage> {
 
       if (state != BluetoothAdapterState.on) {
         if (mounted) {
-          setState(() => _scanning = false);
+          setState(() => scanning = false);
         }
-        _snack(DevicesStrings.notBluetoothActivated);
+        snack(DevicesStrings.notBluetoothActivated);
         return;
       }
 
@@ -108,85 +108,85 @@ class _ShellyBleProvisionPageState extends State<ShellyBleProvisionPage> {
       );
     } catch (e) {
       if (mounted) {
-        setState(() => _scanning = false);
+        setState(() => scanning = false);
       }
-      _snack(DevicesStrings.errorConnectingBLE);
+      snack(DevicesStrings.errorConnectingBLE);
       return;
     }
 
-    await _scanResultsSub?.cancel();
-    _scanResultsSub = FlutterBluePlus.scanResults.listen((results) {
+    await scanResultsSub?.cancel();
+    scanResultsSub = FlutterBluePlus.scanResults.listen((results) {
       if (!mounted) return;
       setState(() {
-        _scanResults = _filterAndDedup(results);
+        scanResults = filterAndDedup(results);
       });
     });
 
-    await _scanSub?.cancel();
-    _scanSub = FlutterBluePlus.isScanning.listen((scanning) {
+    await scanSub?.cancel();
+    scanSub = FlutterBluePlus.isScanning.listen((scanning) {
       if (!mounted) return;
       if (!scanning) {
-        setState(() => _scanning = false);
+        setState(() => this.scanning = false);
       }
     });
   }
 
-  Future<void> _stopScan() async {
-    await _scanResultsSub?.cancel();
-    _scanResultsSub = null;
+  Future<void> stopScan() async {
+    await scanResultsSub?.cancel();
+    scanResultsSub = null;
     try {
       await FlutterBluePlus.stopScan();
     } catch (_) {}
-    if (mounted) setState(() => _scanning = false);
+    if (mounted) setState(() => scanning = false);
   }
 
-  Future<void> _provision() async {
-    final ssid = _ssidCtrl.text.trim();
-    final pass = _passCtrl.text;
+  Future<void> provision() async {
+    final ssid = ssidCtrl.text.trim();
+    final pass = passCtrl.text;
 
-    if (_selected == null) {
-      _snack(DevicesStrings.selectDevice);
+    if (selected == null) {
+      snack(DevicesStrings.selectDevice);
       return;
     }
     if (ssid.isEmpty) {
-      _snack(IoTStrings.SSIDRequiredWIFI);
+      snack(IoTStrings.ssidRequiredWifi);
       return;
     }
     if (pass.isEmpty) {
-      _snack(IoTStrings.passwordRequiredWIFI);
+      snack(IoTStrings.passwordRequiredWIFI);
       return;
     }
 
     setState(() {
-      _provisioning = true;
-      _status = DevicesStrings.connectionBLE;
+      provisioning = true;
+      status = DevicesStrings.connectionBLE;
     });
 
-    final device = _selected!.device;
+    final device = selected!.device;
     final client = ShellyBleRpcClient(device);
 
     try {
-      await _stopScan();
+      await stopScan();
       await client.connect();
 
-      _setStatus(DevicesStrings.MACDevice);
+      setStatus(DevicesStrings.macDevice);
       final realMac = await client.getRealMac();
 
-      _setStatus(DevicesStrings.credentialsDevices);
+      setStatus(DevicesStrings.credentialsDevices);
       await client.setWifiSta(ssid: ssid, pass: pass);
 
-      _setStatus(DevicesStrings.rebootDevice);
+      setStatus(DevicesStrings.rebootDevice);
       await client.reboot(delayMs: 3000);
       await client.disconnect();
 
-      _setStatus(DevicesStrings.runDevice);
+      setStatus(DevicesStrings.runDevice);
       await Future.delayed(const Duration(seconds: 25));
 
       ShellyLanDiscoveryResult? found;
       final discovery = ShellyLanDiscovery();
 
       for (int attempt = 1; attempt <= 4; attempt++) {
-        _setStatus(DevicesStrings.searchShellyDevices + '($attempt/4)');
+        setStatus('${DevicesStrings.searchShellyDevices}($attempt/4)');
         found = await discovery.discoverFirst(
           expectedMac: realMac,
           perHostTimeout: const Duration(milliseconds: 600),
@@ -199,7 +199,7 @@ class _ShellyBleProvisionPageState extends State<ShellyBleProvisionPage> {
       }
 
       if (found == null) {
-        _snack(DevicesStrings.notFoundDevice);
+        snack(DevicesStrings.notFoundDevice);
         return;
       }
 
@@ -212,32 +212,32 @@ class _ShellyBleProvisionPageState extends State<ShellyBleProvisionPage> {
         ),
       );
     } catch (e) {
-      _snack(DevicesStrings.errorProvisioningBLE);
+      snack(DevicesStrings.errorProvisioningBLE);
     } finally {
       try {
         await client.disconnect();
       } catch (_) {}
       if (mounted) {
         setState(() {
-          _provisioning = false;
-          _status = '';
+          provisioning = false;
+          status = '';
         });
       }
     }
   }
 
-  void _setStatus(String msg) {
-    if (mounted) setState(() => _status = msg);
+  void setStatus(String msg) {
+    if (mounted) setState(() => status = msg);
   }
 
-  void _snack(String msg) {
+  void snack(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg)),
     );
   }
 
-  String _displayName(ScanResult r) {
+  String displayName(ScanResult r) {
     final adv = r.advertisementData.advName.trim();
     final platform = r.device.platformName.trim();
     if (adv.isNotEmpty) return adv;
@@ -247,7 +247,7 @@ class _ShellyBleProvisionPageState extends State<ShellyBleProvisionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final canProvision = !_provisioning && _selected != null;
+    final canProvision = !provisioning && selected != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -263,12 +263,12 @@ class _ShellyBleProvisionPageState extends State<ShellyBleProvisionPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   FilledButton.icon(
-                    onPressed: _scanning ? _stopScan : _startScan,
+                    onPressed: scanning ? stopScan : startScan,
                     icon: Icon(
-                      _scanning ? Icons.stop : Icons.bluetooth_searching,
+                      scanning ? Icons.stop : Icons.bluetooth_searching,
                     ),
                     label: Text(
-                      _scanning ? DevicesStrings.stopEscanning : DevicesStrings.scanningBle,
+                      scanning ? DevicesStrings.stopEscanning : DevicesStrings.scanningBle,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -276,21 +276,21 @@ class _ShellyBleProvisionPageState extends State<ShellyBleProvisionPage> {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
-                  if (_scanning && _scanResults.isEmpty)
+                  if (scanning && scanResults.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 8),
                       child: Text(DevicesStrings.searchShellyDevices),
                     )
-                  else if (_scanResults.isEmpty)
+                  else if (scanResults.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 8),
                       child: Text(DevicesStrings.notFoundBluetoothDevices),
                     )
                   else
                     Column(
-                      children: _scanResults.map((r) {
-                        final name = _displayName(r);
-                        final selected = _selected?.device.remoteId == r.device.remoteId;
+                      children: scanResults.map((r) {
+                        final name = displayName(r);
+                        final selected = this.selected?.device.remoteId == r.device.remoteId;
 
                         return Card(
                           elevation: 0,
@@ -303,7 +303,7 @@ class _ShellyBleProvisionPageState extends State<ShellyBleProvisionPage> {
                             ),
                             title: Text(name),
                             subtitle: Text('RSSI: ${r.rssi} • ${r.device.remoteId.str}',),
-                            onTap: () => setState(() => _selected = r),
+                            onTap: () => setState(() => this.selected = r),
                           ),
                         );
                       }).toList(),
@@ -319,14 +319,14 @@ class _ShellyBleProvisionPageState extends State<ShellyBleProvisionPage> {
               child: Column(
                 children: [
                   TextField(
-                    controller: _ssidCtrl,
+                    controller: ssidCtrl,
                     decoration: const InputDecoration(
-                      labelText: DevicesStrings.SSID,
+                      labelText: DevicesStrings.ssid,
                     ),
                   ),
                   const SizedBox(height: 10),
                   TextField(
-                    controller: _passCtrl,
+                    controller: passCtrl,
                     obscureText: true,
                     decoration: const InputDecoration(
                       labelText: DevicesStrings.password,
@@ -336,7 +336,7 @@ class _ShellyBleProvisionPageState extends State<ShellyBleProvisionPage> {
               ),
             ),
           ),
-          if (_status.isNotEmpty) ...[
+          if (status.isNotEmpty) ...[
             const SizedBox(height: 12),
             Card(
               child: Padding(
@@ -349,7 +349,7 @@ class _ShellyBleProvisionPageState extends State<ShellyBleProvisionPage> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                     const SizedBox(width: 12),
-                    Expanded(child: Text(_status)),
+                    Expanded(child: Text(status)),
                   ],
                 ),
               ),
@@ -360,10 +360,10 @@ class _ShellyBleProvisionPageState extends State<ShellyBleProvisionPage> {
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.all(16),
         child: FilledButton.icon(
-          onPressed: canProvision ? _provision : null,
+          onPressed: canProvision ? provision : null,
           icon: const Icon(Icons.link),
           label: Text(
-            _provisioning ? DevicesStrings.connectingDevice : DevicesStrings.vindicatingDevice,
+            provisioning ? DevicesStrings.connectingDevice : DevicesStrings.vindicatingDevice,
           ),
         ),
       ),

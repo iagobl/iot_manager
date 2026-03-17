@@ -1,6 +1,6 @@
 class AppFailure {
-  final String message;
   const AppFailure(this.message);
+  final String message;
 }
 
 class AuthFailure extends AppFailure {

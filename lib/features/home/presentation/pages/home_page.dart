@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+
+import 'package:iot_manager/core/constants/app_strings.dart';
 import 'package:iot_manager/core/constants/auth_strings.dart';
 import 'package:iot_manager/core/constants/devices_strings.dart';
+import 'package:iot_manager/core/constants/home_strings.dart';
+import 'package:iot_manager/core/widgets/glass_card.dart';
 
-import '../../../../core/constants/app_strings.dart';
-import '../../../../core/widgets/glass_card.dart';
-import '../../../../core/constants/home_strings.dart';
-import '../controllers/home_controller.dart';
-import '../widgets/home_summary_card.dart';
-import '../widgets/quick_stat_card.dart';
+import 'package:iot_manager/features/home/presentation/controllers/home_controller.dart';
+import 'package:iot_manager/features/home/presentation/widgets/home_summary_card.dart';
+import 'package:iot_manager/features/home/presentation/widgets/quick_stat_card.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -316,10 +317,10 @@ class HomePageState extends State<HomePage> {
 }
 
 class _SectionHeader extends StatelessWidget {
-  final String title;
-  final String subtitle;
 
   const _SectionHeader({required this.title, required this.subtitle});
+  final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -349,11 +350,6 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _EmptyBlock extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final String? actionLabel;
-  final VoidCallback? onAction;
 
   const _EmptyBlock({
     required this.title,
@@ -362,6 +358,11 @@ class _EmptyBlock extends StatelessWidget {
     this.actionLabel,
     this.onAction,
   });
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {

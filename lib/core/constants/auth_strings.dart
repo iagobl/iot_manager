@@ -29,7 +29,7 @@ class AuthStrings {
   static const terms = 'Debes aceptar los términos para continuar';
 
   static const loading = 'Cargando...';
-  static const helloUser = "Bienvenido, ";
+  static const helloUser = 'Bienvenido, ';
   static const againUser = 'de nuevo';
 
   static const createAcount = 'Cuenta creada correctamente';

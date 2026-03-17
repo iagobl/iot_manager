@@ -1,7 +1,6 @@
+import 'package:iot_manager/core/error/app_exception.dart';
+import 'package:iot_manager/core/error/app_failure.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-import 'app_exception.dart';
-import 'app_failure.dart';
 
 class ErrorMapper {
   static AppException mapException(Object error) {

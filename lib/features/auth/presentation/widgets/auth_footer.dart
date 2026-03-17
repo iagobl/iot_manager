@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 
 class AuthFooter extends StatelessWidget {
-  final String text;
-  final String actionText;
-  final VoidCallback onTap;
 
   const AuthFooter({
     super.key,
@@ -11,6 +8,9 @@ class AuthFooter extends StatelessWidget {
     required this.actionText,
     required this.onTap,
   });
+  final String text;
+  final String actionText;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {

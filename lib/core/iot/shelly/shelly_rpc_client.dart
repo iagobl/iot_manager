@@ -3,17 +3,17 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import '../../constants/iot_strings.dart';
-import '../../error/app_exception.dart';
+import 'package:iot_manager/core/constants/iot_strings.dart';
+import 'package:iot_manager/core/error/app_exception.dart';
 
 class ShellyRpcClient {
-  final String host;
-  final http.Client _client;
 
   ShellyRpcClient({
     required this.host,
     http.Client? client,
   }) : _client = client ?? http.Client();
+  final String host;
+  final http.Client _client;
 
   Future<Map<String, dynamic>> call(
       String method, {

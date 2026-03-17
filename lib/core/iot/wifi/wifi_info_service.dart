@@ -1,8 +1,7 @@
+import 'package:iot_manager/core/constants/iot_strings.dart';
+import 'package:iot_manager/core/error/app_exception.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
-
-import '../../constants/iot_strings.dart';
-import '../../error/app_exception.dart';
 
 class WifiInfoService {
   final NetworkInfo info = NetworkInfo();

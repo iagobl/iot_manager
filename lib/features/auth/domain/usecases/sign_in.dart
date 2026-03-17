@@ -1,9 +1,9 @@
-import '../repositories/auth_repository.dart';
+import 'package:iot_manager/features/auth/domain/repositories/auth_repository.dart';
 
 class SignIn {
-  final AuthRepository repository;
 
   SignIn(this.repository);
+  final AuthRepository repository;
 
   Future<void> call({
     required String email,

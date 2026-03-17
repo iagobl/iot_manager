@@ -1,7 +1,4 @@
 class HomeSummary {
-  final String id;
-  final String name;
-  final DateTime? createdAt;
 
   const HomeSummary({
     required this.id,
@@ -20,4 +17,7 @@ class HomeSummary {
           : DateTime.tryParse(map['created_at'].toString()),
     );
   }
+  final String id;
+  final String name;
+  final DateTime? createdAt;
 }

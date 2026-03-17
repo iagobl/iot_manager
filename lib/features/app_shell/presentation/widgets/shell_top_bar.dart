@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_strings.dart';
+import 'package:iot_manager/core/constants/app_strings.dart';
 
 class ShellTopBar extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final VoidCallback? onLogout;
 
   const ShellTopBar({
     super.key,
@@ -13,6 +10,9 @@ class ShellTopBar extends StatelessWidget {
     required this.subtitle,
     this.onLogout,
   });
+  final String title;
+  final String subtitle;
+  final VoidCallback? onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +62,7 @@ class ShellTopBar extends StatelessWidget {
               },
               icon: const Icon(Icons.person_outline_rounded),
               itemBuilder: (context) => [
-                PopupMenuItem<String>(
+                const PopupMenuItem<String>(
                   enabled: false,
                   value: 'app',
                   child: Text(AppStrings.appName),

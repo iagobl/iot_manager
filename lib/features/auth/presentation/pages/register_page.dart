@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 
-import '../../../../app/routes.dart';
-import '../../../../core/widgets/app_background.dart';
-import '../widgets/auth_brand_header.dart';
-import '../../../../core/widgets/app_text_field.dart';
-import '../../../../core/widgets/glass_card.dart';
-import '../../../../core/widgets/primary_button.dart';
-import '../../../../core/utils/validators.dart';
-import '../../../../core/constants/auth_strings.dart';
+import 'package:iot_manager/app/routes.dart';
 
-import '../controllers/register_controller.dart';
-import '../widgets/auth_footer.dart';
-import '../widgets/auth_header.dart';
+import 'package:iot_manager/core/constants/auth_strings.dart';
+import 'package:iot_manager/core/utils/validators.dart';
+import 'package:iot_manager/core/widgets/app_background.dart';
+import 'package:iot_manager/core/widgets/app_text_field.dart';
+import 'package:iot_manager/core/widgets/glass_card.dart';
+import 'package:iot_manager/core/widgets/primary_button.dart';
+
+import 'package:iot_manager/features/auth/presentation/controllers/register_controller.dart';
+import 'package:iot_manager/features/auth/presentation/widgets/auth_brand_header.dart';
+import 'package:iot_manager/features/auth/presentation/widgets/auth_footer.dart';
+import 'package:iot_manager/features/auth/presentation/widgets/auth_header.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});

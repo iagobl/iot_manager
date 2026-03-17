@@ -1,23 +1,33 @@
 import 'package:flutter/foundation.dart';
-import 'package:iot_manager/core/constants/devices_strings.dart';
 
-import '../../../../core/error/error_mapper.dart';
-import '../../../../core/iot/models/discovered_iot_device.dart';
-import '../../../../core/iot/shelly/shelly_lan_discovery.dart';
-import '../../../../core/iot/shelly/shelly_rpc_client.dart';
-import '../../data/datasources/devices_remote_datasource.dart';
-import '../../data/repositories/devices_repository_impl.dart';
-import '../../domain/entities/device_item.dart';
-import '../../domain/usecases/get_user_devices.dart';
+import 'package:iot_manager/core/constants/devices_strings.dart';
+import 'package:iot_manager/core/error/error_mapper.dart';
+import 'package:iot_manager/core/iot/models/discovered_iot_device.dart';
+import 'package:iot_manager/core/iot/shelly/shelly_lan_discovery.dart';
+import 'package:iot_manager/core/iot/shelly/shelly_rpc_client.dart';
+
+import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
+import 'package:iot_manager/features/devices/data/repositories/devices_repository_impl.dart';
+import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
+
+import 'package:iot_manager/features/devices/domain/usecases/get_user_devices.dart';
 
 class DevicesController extends ChangeNotifier {
-  final GetUserDevices getUserDevices;
-  final DevicesRemoteDatasource remoteDatasource;
 
   DevicesController(
       this.getUserDevices,
       this.remoteDatasource,
       );
+
+  factory DevicesController.create() {
+    final datasource = DevicesRemoteDatasource();
+    final repository = DevicesRepositoryImpl(datasource);
+    final usecase = GetUserDevices(repository);
+
+    return DevicesController(usecase, datasource);
+  }
+  final GetUserDevices getUserDevices;
+  final DevicesRemoteDatasource remoteDatasource;
 
   bool isLoading = false;
   String? errorMessages;
@@ -28,14 +38,6 @@ class DevicesController extends ChangeNotifier {
   String? get errorMessage => errorMessages;
   List<DeviceItem> get devices => items;
   List<DiscoveredIotDevice> get scannedDevices => discoveredDevices;
-
-  factory DevicesController.create() {
-    final datasource = DevicesRemoteDatasource();
-    final repository = DevicesRepositoryImpl(datasource);
-    final usecase = GetUserDevices(repository);
-
-    return DevicesController(usecase, datasource);
-  }
 
   Future<void> load() async {
     setLoading(true);

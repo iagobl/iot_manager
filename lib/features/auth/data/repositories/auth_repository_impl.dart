@@ -1,12 +1,12 @@
-import '../../../../core/error/app_failure.dart';
-import '../../../../core/error/error_mapper.dart';
-import '../../domain/repositories/auth_repository.dart';
-import '../datasources/auth_remote_datasource.dart';
+import 'package:iot_manager/core/error/error_mapper.dart';
+
+import 'package:iot_manager/features/auth/data/datasources/auth_remote_datasource.dart';
+import 'package:iot_manager/features/auth/domain/repositories/auth_repository.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
-  final AuthRemoteDatasource remoteDatasource;
 
   AuthRepositoryImpl(this.remoteDatasource);
+  final AuthRemoteDatasource remoteDatasource;
 
   @override
   Future<void> signIn({

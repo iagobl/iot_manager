@@ -1,9 +1,9 @@
-import '../repositories/auth_repository.dart';
+import 'package:iot_manager/features/auth/domain/repositories/auth_repository.dart';
 
 class SignOut {
-  final AuthRepository repository;
 
   SignOut(this.repository);
+  final AuthRepository repository;
 
   Future<void> call() {
     return repository.signOut();

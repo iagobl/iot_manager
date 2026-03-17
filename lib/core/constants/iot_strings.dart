@@ -1,5 +1,5 @@
 class IoTStrings {
-  static const SSIDRequiredWIFI = 'La red Wi-Fi seleccionada requiere un SSID. Por favor, ingresa el SSID para continuar';
+  static const ssidRequiredWifi = 'La red Wi-Fi seleccionada requiere un SSID. Por favor, ingresa el SSID para continuar';
   static const passwordRequiredWIFI = 'La red Wi-Fi seleccionada requiere contraseña. Por favor, ingresa la contraseña para continuar';
 
   static const blockPermissions = 'Permisos BLE bloqueados. Ve a Ajustes > Apps > tu app > Permisos y habilita Bluetooth y Ubicación.';

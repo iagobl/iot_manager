@@ -6,10 +6,11 @@ import 'dart:typed_data';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:iot_manager/core/constants/iot_strings.dart';
 
-import '../../constants/devices_strings.dart';
-import '../../error/app_exception.dart';
+import 'package:iot_manager/core/error/app_exception.dart';
 
 class ShellyBleRpcClient {
+
+  ShellyBleRpcClient(this.device);
   static final Guid shellyServiceUuid = Guid('5f6d4f53-5f52-5043-5f53-56435f49445f');
   static final Guid rpcDataUuid = Guid('5f6d4f53-5f52-5043-5f64-6174615f5f5f');
   static final Guid rpcTxCtlUuid = Guid('5f6d4f53-5f52-5043-5f74-785f63746c5f');
@@ -26,8 +27,6 @@ class ShellyBleRpcClient {
 
   StreamSubscription<List<int>>? rxCtlSub;
   int lastNotifiedLen = 0;
-
-  ShellyBleRpcClient(this.device);
 
   Future<void> connect({
     Duration timeout = const Duration(seconds: 30),
@@ -46,7 +45,7 @@ class ShellyBleRpcClient {
           break;
         } catch (error) {
           if (attempt == 1) {
-            throw NetworkAppException(IoTStrings.notConnectingWithBluetooth);
+            throw const NetworkAppException(IoTStrings.notConnectingWithBluetooth);
           }
           await Future.delayed(const Duration(milliseconds: 700));
         }
@@ -155,11 +154,11 @@ class ShellyBleRpcClient {
       final decoded = jsonDecode(respStr);
 
       if (decoded is! Map<String, dynamic>) {
-        throw ValidationAppException(IoTStrings.invalidRequestBLE);
+        throw const ValidationAppException(IoTStrings.invalidRequestBLE);
       }
 
       if (decoded['id'] != id) {
-        throw ValidationAppException(IoTStrings.errorReceivedBLE);
+        throw const ValidationAppException(IoTStrings.errorReceivedBLE);
       }
 
       if (decoded.containsKey('error')) {
@@ -223,7 +222,7 @@ class ShellyBleRpcClient {
     required String pass,
   }) async {
     if (ssid.trim().isEmpty) {
-      throw const ValidationAppException(IoTStrings.SSIDRequiredWIFI);
+      throw const ValidationAppException(IoTStrings.ssidRequiredWifi);
     }
 
     if (pass.isEmpty) {

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../features/app_shell/presentation/app_shell.dart';
-import '../features/auth/presentation/pages/auth_gate.dart';
-import '../features/auth/presentation/pages/forgot_password_page.dart';
-import '../features/auth/presentation/pages/login_page.dart';
-import '../features/auth/presentation/pages/register_page.dart';
+import 'package:iot_manager/features/app_shell/presentation/app_shell.dart';
+import 'package:iot_manager/features/auth/presentation/pages/auth_gate.dart';
+import 'package:iot_manager/features/auth/presentation/pages/forgot_password_page.dart';
+import 'package:iot_manager/features/auth/presentation/pages/login_page.dart';
+import 'package:iot_manager/features/auth/presentation/pages/register_page.dart';
 
 class Routes {
   static const authGate = '/';

@@ -1,12 +1,13 @@
-import '../../../../core/error/error_mapper.dart';
-import '../../domain/entities/device_item.dart';
-import '../../domain/repositories/devices_repository.dart';
-import '../datasources/devices_remote_datasource.dart';
+import 'package:iot_manager/core/error/error_mapper.dart';
+
+import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
+import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
+import 'package:iot_manager/features/devices/domain/repositories/devices_repository.dart';
 
 class DevicesRepositoryImpl implements DevicesRepository {
-  final DevicesRemoteDatasource remoteDatasource;
 
   DevicesRepositoryImpl(this.remoteDatasource);
+  final DevicesRemoteDatasource remoteDatasource;
 
   @override
   Future<List<DeviceItem>> getUserDevices() async {

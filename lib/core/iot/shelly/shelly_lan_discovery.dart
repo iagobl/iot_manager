@@ -3,31 +3,30 @@ import 'dart:collection';
 
 import 'package:http/http.dart' as http;
 import 'package:iot_manager/core/constants/iot_strings.dart';
-
-import '../../error/app_exception.dart';
-import '../models/discovered_iot_device.dart';
-import '../wifi/wifi_info_service.dart';
-import 'shelly_rpc_client.dart';
+import 'package:iot_manager/core/error/app_exception.dart';
+import 'package:iot_manager/core/iot/models/discovered_iot_device.dart';
+import 'package:iot_manager/core/iot/shelly/shelly_rpc_client.dart';
+import 'package:iot_manager/core/iot/wifi/wifi_info_service.dart';
 
 class ShellyLanDiscoveryResult {
-  final String ip;
-  final Map<String, dynamic> deviceInfo;
 
   ShellyLanDiscoveryResult({
     required this.ip,
     required this.deviceInfo,
   });
+  final String ip;
+  final Map<String, dynamic> deviceInfo;
 }
 
 class ShellyLanDiscovery {
-  final WifiInfoService wifiInfoService;
-  final http.Client _client;
 
   ShellyLanDiscovery({
     WifiInfoService? wifi,
     http.Client? client,
   })  : wifiInfoService = wifi ?? WifiInfoService(),
-        this._client = client ?? http.Client();
+        _client = client ?? http.Client();
+  final WifiInfoService wifiInfoService;
+  final http.Client _client;
 
   Future<ShellyLanDiscoveryResult?> discoverFirst({
     String? expectedMac,
@@ -99,7 +98,7 @@ class ShellyLanDiscovery {
       final sem = Semaphore(concurrency);
       final results = <DiscoveredIotDevice>[];
 
-      bool reachedLimit() => maxResults != null && results.length >= maxResults!;
+      bool reachedLimit() => maxResults != null && results.length >= maxResults;
 
       final futures = <Future<void>>[];
 
@@ -180,10 +179,10 @@ class ShellyLanDiscovery {
 }
 
 class Semaphore {
-  int permits;
-  final Queue<Completer<void>> waiters = Queue();
 
   Semaphore(this.permits);
+  int permits;
+  final Queue<Completer<void>> waiters = Queue();
 
   Future<void> acquire() {
     if (permits > 0) {
