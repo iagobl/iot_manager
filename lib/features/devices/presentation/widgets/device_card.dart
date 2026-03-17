@@ -8,9 +8,11 @@ class DeviceCard extends StatelessWidget {
     super.key,
     required this.device,
     this.onToggle,
+    this.onTap,
   });
   final DeviceItem device;
   final ValueChanged<bool>? onToggle;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -18,6 +20,7 @@ class DeviceCard extends StatelessWidget {
 
     return Card(
       child: ListTile(
+        onTap: onTap,
         leading: Icon(
           isLight ? Icons.lightbulb_outline_rounded : Icons.power_rounded,
         ),

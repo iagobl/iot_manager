@@ -1,4 +1,5 @@
 import 'package:iot_manager/core/constants/auth_strings.dart';
+import 'package:iot_manager/core/constants/devices_panel_strings.dart';
 import 'package:iot_manager/core/constants/devices_strings.dart';
 import 'package:iot_manager/core/error/app_exception.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
@@ -52,8 +53,8 @@ class DevicesRemoteDatasource {
 
       await _client.from('devices').insert({
         'name': name.trim(),
-        'device_type': deviceType,
-        'protocol': protocol,
+        'device_type': deviceType.trim(),
+        'protocol': protocol.trim(),
         'identifier': identifier.trim(),
         'is_active': false,
         'owner_id': userId,
@@ -66,15 +67,13 @@ class DevicesRemoteDatasource {
     }
   }
 
-  Future<void> updateDeviceState(
-      String deviceId,
-      bool isActive,
-      ) async {
+  Future<void> updateDeviceState(String deviceId, bool isActive) async {
     try {
-      await _client
-          .from('devices')
-          .update({'is_active': isActive})
-          .eq('id', deviceId);
+      if (deviceId.trim().isEmpty) {
+        throw const ValidationAppException(DevicesPanelStrings.notValidIndentifier,);
+      }
+
+      await _client.from('devices').update({'is_active': isActive}).eq('id', deviceId);
     } catch (error) {
       throw ErrorMapper.mapException(error);
     }
@@ -82,6 +81,10 @@ class DevicesRemoteDatasource {
 
   Future<void> deleteDevice(String id) async {
     try {
+      if (id.trim().isEmpty) {
+        throw const ValidationAppException(DevicesPanelStrings.notValidIndentifier);
+      }
+
       await _client.from('devices').delete().eq('id', id);
     } catch (error) {
       throw ErrorMapper.mapException(error);

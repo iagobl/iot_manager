@@ -4,6 +4,9 @@ class DevicesStrings {
   static const devices = 'Dispositivos';
   static const active = 'Activos';
 
+  static const on = 'ON';
+  static const off = 'OFF';
+
   static const notDeviceName = 'El nombre del dispositivo no puede estar vacío';
   static const notDeviceIdentifier = 'La IP o identificador del dispositivo no puede estar vacío';
   static const notShellyinLAN = 'No se han encontrado dispositivos Shelly en la red';

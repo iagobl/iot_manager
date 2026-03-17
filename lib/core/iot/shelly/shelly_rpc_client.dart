@@ -7,11 +7,11 @@ import 'package:iot_manager/core/constants/iot_strings.dart';
 import 'package:iot_manager/core/error/app_exception.dart';
 
 class ShellyRpcClient {
-
   ShellyRpcClient({
     required this.host,
     http.Client? client,
   }) : _client = client ?? http.Client();
+
   final String host;
   final http.Client _client;
 
@@ -20,6 +20,12 @@ class ShellyRpcClient {
         Map<String, dynamic>? params,
         Duration timeout = const Duration(seconds: 4),
       }) async {
+    if (host.trim().isEmpty) {
+      throw const ValidationAppException(
+        'La dirección del dispositivo no es válida.',
+      );
+    }
+
     try {
       final body = <String, dynamic>{
         'id': 1,
@@ -30,7 +36,7 @@ class ShellyRpcClient {
 
       final res = await _client.post(
         Uri.parse('http://$host/rpc'),
-        headers: {'Content-Type': 'application/json'},
+        headers: const {'Content-Type': 'application/json'},
         body: jsonEncode(body),
       ).timeout(timeout);
 
@@ -42,11 +48,17 @@ class ShellyRpcClient {
 
       final decoded = jsonDecode(res.body);
       if (decoded is! Map<String, dynamic>) {
-        throw const ValidationAppException(IoTStrings.notValidRequest,);
+        throw const ValidationAppException(IoTStrings.notValidResponseFormat);
       }
 
-      if (decoded.containsKey('error')) {
-        throw ServerAppException(IoTStrings.errorRPCDevice + decoded['error'].toString());
+      if (decoded['error'] != null) {
+        throw DeviceAppException(
+          '${IoTStrings.errorRPCDevice}${decoded['error']}',
+        );
+      }
+
+      if (!decoded.containsKey('result')) {
+        throw const ValidationAppException(IoTStrings.notValidResponseFormat);
       }
 
       final result = decoded['result'];
@@ -65,11 +77,15 @@ class ShellyRpcClient {
     }
   }
 
-  Future<Map<String, dynamic>> getDeviceInfo() => call('Shelly.GetDeviceInfo');
+  Future<Map<String, dynamic>> getDeviceInfo() async {
+    return call('Shelly.GetDeviceInfo');
+  }
 
-  Future<Map<String, dynamic>> getSwitchStatus({int id = 0}) =>
-      call('Switch.GetStatus', params: {'id': id});
+  Future<Map<String, dynamic>> getSwitchStatus({int id = 0}) async {
+    return call('Switch.GetStatus', params: {'id': id});
+  }
 
-  Future<void> setSwitch({required bool on, int id = 0,}) =>
-      call('Switch.Set', params: {'id': id, 'on': on});
+  Future<void> setSwitch({required bool on, int id = 0,}) async {
+    await call('Switch.Set', params: {'id': id, 'on': on});
+  }
 }

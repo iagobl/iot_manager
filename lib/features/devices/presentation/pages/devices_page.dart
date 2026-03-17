@@ -5,6 +5,7 @@ import 'package:iot_manager/core/constants/devices_strings.dart';
 import 'package:iot_manager/core/iot/models/discovered_iot_device.dart';
 
 import 'package:iot_manager/features/devices/presentation/controllers/devices_controller.dart';
+import 'package:iot_manager/features/devices/presentation/pages/device_panel_page.dart';
 import 'package:iot_manager/features/devices/presentation/pages/shelly_ble_provision_page.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/device_card.dart';
 
@@ -382,6 +383,17 @@ class DevicesPageState extends State<DevicesPage> {
           padding: const EdgeInsets.only(bottom: 12),
           child: DeviceCard(
             device: controller.devices[index],
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DevicePanelPage(
+                    device: controller.devices[index],
+                  ),
+                ),
+              );
+              if (!mounted) return;
+              await controller.load();
+            },
             onToggle: (value) async {
               await controller.toggleDevice(
                 controller.devices[index],

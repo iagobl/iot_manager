@@ -1,5 +1,6 @@
 class AppFailure {
   const AppFailure(this.message);
+
   final String message;
 }
 
@@ -29,6 +30,10 @@ class BluetoothFailure extends AppFailure {
 
 class DeviceFailure extends AppFailure {
   const DeviceFailure(super.message);
+}
+
+class DatabaseFailure extends AppFailure {
+  const DatabaseFailure(super.message);
 }
 
 class UnknownFailure extends AppFailure {
