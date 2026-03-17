@@ -3,12 +3,12 @@ import 'package:iot_manager/core/constants/devices_panel_strings.dart';
 
 import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
 import 'package:iot_manager/features/devices/presentation/controllers/device_panel_controller.dart';
-import 'package:iot_manager/features/devices/presentation/widgets/device_detail_sidebar.dart';
-import 'package:iot_manager/features/devices/presentation/widgets/device_metric_card.dart';
-import 'package:iot_manager/features/devices/presentation/widgets/device_panel_styles.dart';
-import 'package:iot_manager/features/devices/presentation/widgets/device_panel_top_bar.dart';
-import 'package:iot_manager/features/devices/presentation/widgets/device_placeholder_section.dart';
-import 'package:iot_manager/features/devices/presentation/widgets/device_power_panel.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/shared/device_detail_sidebar.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/shared/device_metric_card.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/shared/device_panel_styles.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/shared/device_panel_top_bar.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/shared/device_placeholder_section.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/sections/device_power_panel.dart';
 
 enum DevicePanelSection {
   overview,

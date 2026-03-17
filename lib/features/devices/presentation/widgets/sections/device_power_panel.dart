@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:iot_manager/core/constants/devices_panel_strings.dart';
 import 'package:iot_manager/core/constants/devices_strings.dart';
 
-import 'package:iot_manager/features/devices/presentation/widgets/device_panel_styles.dart';
-import 'package:iot_manager/features/devices/presentation/widgets/device_status_pill.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/shared/device_panel_styles.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/shared/device_status_pill.dart';
 
 class DevicePowerPanel extends StatelessWidget {
   const DevicePowerPanel({
