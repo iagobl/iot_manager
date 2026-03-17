@@ -1,6 +1,8 @@
 class DevicesStrings {
   static const SSID = 'SSID';
-  static  const password = 'Contraseña Wi-Fi';
+  static const password = 'Contraseña Wi-Fi';
+  static const devices = 'Dispositivos';
+  static const active = 'Activos';
 
   static const notDeviceName = 'El nombre del dispositivo no puede estar vacío';
   static const notDeviceIdentifier = 'La IP o identificador del dispositivo no puede estar vacío';

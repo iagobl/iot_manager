@@ -21,16 +21,16 @@ class AuthStrings {
 
   static const forgotPassword = '¿Has olvidado la contraseña?';
   static const recoverPasswordTitle = 'Recuperar contraseña';
-  static const recoverPasswordSubtitle =
-      'Te enviaremos un email para restablecer tu contraseña.';
+  static const recoverPasswordSubtitle = 'Te enviaremos un email para restablecer tu contraseña.';
   static const sendRecoveryEmail = 'Enviar email';
   static const recoveryEmail = 'Email enviado. Revisa tu correo.';
 
-  static const acceptTerms =
-      'He leído y acepto los términos y la política de privacidad';
+  static const acceptTerms = 'He leído y acepto los términos y la política de privacidad';
   static const terms = 'Debes aceptar los términos para continuar';
 
   static const loading = 'Cargando...';
+  static const helloUser = "Bienvenido, ";
+  static const againUser = 'de nuevo';
 
   static const createAcount = 'Cuenta creada correctamente';
 

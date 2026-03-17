@@ -1,26 +1,59 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 
 class GlassCard extends StatelessWidget {
   final Widget child;
-  const GlassCard({super.key, required this.child});
+  final EdgeInsetsGeometry padding;
+  final double borderRadius;
+  final VoidCallback? onTap;
+
+  const GlassCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(20),
+    this.borderRadius = 24,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            color: cs.surface.withValues(alpha: 0.65),
-            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.7)),
+    final card = Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(borderRadius),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            cs.surface.withValues(alpha: 0.78),
+            cs.surfaceContainerHighest.withValues(alpha: 0.62),
+          ],
+        ),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.65),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
-          padding: const EdgeInsets.all(20),
-          child: child,
+        ],
+      ),
+      padding: padding,
+      child: child,
+    );
+
+    return RepaintBoundary(
+      child: onTap == null
+          ? card
+          : Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(borderRadius),
+          onTap: onTap,
+          child: card,
         ),
       ),
     );

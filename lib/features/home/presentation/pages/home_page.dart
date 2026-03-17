@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:iot_manager/core/constants/auth_strings.dart';
+import 'package:iot_manager/core/constants/devices_strings.dart';
 
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/glass_card.dart';
@@ -42,7 +44,7 @@ class HomePageState extends State<HomePage> {
   String get welcomeName {
     final name = controller.firstName.trim();
     if (name.isNotEmpty) return name;
-    return 'de nuevo';
+    return AuthStrings.againUser;
   }
 
   Future<void> showCreateHomeDialog() async {
@@ -58,7 +60,7 @@ class HomePageState extends State<HomePage> {
             autofocus: true,
             textInputAction: TextInputAction.done,
             decoration: const InputDecoration(
-              hintText: 'Ej. Casa principal',
+              hintText: HomeStrings.ejHome,
               labelText: HomeStrings.nameHome,
             ),
             onSubmitted: (_) => Navigator.of(context).pop(true),
@@ -85,7 +87,8 @@ class HomePageState extends State<HomePage> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok
+        content: Text(
+          ok
               ? HomeStrings.confirmationCreateHome
               : (controller.errorMessage ?? HomeStrings.notConfirmationCreateHome),
         ),
@@ -103,8 +106,7 @@ class HomePageState extends State<HomePage> {
         return AlertDialog(
           title: const Text(HomeStrings.deleteHome),
           content: Text(
-            '¿Quieres eliminar "$homeName"?\n\n'
-                'Los dispositivos seguirán existiendo, pero dejarán de estar asociados a este hogar.',
+            '¿Quieres eliminar "$homeName"?\n\n${HomeStrings.deleteHomeDescription}',
           ),
           actions: [
             TextButton(
@@ -128,7 +130,8 @@ class HomePageState extends State<HomePage> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok
+        content: Text(
+          ok
               ? HomeStrings.confirmationDeleteHome
               : (controller.errorMessage ?? HomeStrings.notConfirmationDeleteHome),
         ),
@@ -146,23 +149,25 @@ class HomePageState extends State<HomePage> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: GlassCard(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline_rounded, size: 40),
-                const SizedBox(height: 14),
-                Text(
-                  controller.errorMessage!,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  onPressed: controller.load,
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text(AppStrings.retry),
-                ),
-              ],
+          child: RepaintBoundary(
+            child: GlassCard(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline_rounded, size: 40),
+                  const SizedBox(height: 14),
+                  Text(
+                    controller.errorMessage!,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    onPressed: controller.load,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text(AppStrings.retry),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -175,73 +180,75 @@ class HomePageState extends State<HomePage> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 110),
         children: [
-          GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Bienvenido, $welcomeName',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  HomeStrings.descriptionHome,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth > 700;
-              final itemWidth = isWide
-                  ? (constraints.maxWidth - 24) / 3
-                  : (constraints.maxWidth - 12) / 2;
-
-              return Wrap(
-                spacing: 12,
-                runSpacing: 12,
+          RepaintBoundary(
+            child: GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    width: itemWidth,
-                    child: QuickStatCard(
-                      label: 'Hogares',
-                      value: controller.totalHomes.toString(),
-                      icon: Icons.home_work_outlined,
+                  Text(AuthStrings.helloUser + welcomeName,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: QuickStatCard(
-                      label: 'Dispositivos',
-                      value: controller.totalDevices.toString(),
-                      icon: Icons.devices_other_outlined,
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: QuickStatCard(
-                      label: 'Activos',
-                      value: controller.activeDevices.toString(),
-                      icon: Icons.bolt_rounded,
-                    ),
-                  ),
-                  SizedBox(
-                    width: itemWidth,
-                    child: QuickStatCard(
-                      label: 'Consumo hoy',
-                      value: '${controller.totalTodayWh.toStringAsFixed(0)} Wh',
-                      icon: Icons.energy_savings_leaf_outlined,
+                  const SizedBox(height: 8),
+                  Text(HomeStrings.descriptionHome,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
-              );
-            },
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          RepaintBoundary(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth > 700;
+                final itemWidth = isWide
+                    ? (constraints.maxWidth - 24) / 3
+                    : (constraints.maxWidth - 12) / 2;
+
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    SizedBox(
+                      width: itemWidth,
+                      child: QuickStatCard(
+                        label: HomeStrings.homes,
+                        value: controller.totalHomes.toString(),
+                        icon: Icons.home_work_outlined,
+                      ),
+                    ),
+                    SizedBox(
+                      width: itemWidth,
+                      child: QuickStatCard(
+                        label: DevicesStrings.devices,
+                        value: controller.totalDevices.toString(),
+                        icon: Icons.devices_other_outlined,
+                      ),
+                    ),
+                    SizedBox(
+                      width: itemWidth,
+                      child: QuickStatCard(
+                        label: DevicesStrings.active,
+                        value: controller.activeDevices.toString(),
+                        icon: Icons.bolt_rounded,
+                      ),
+                    ),
+                    SizedBox(
+                      width: itemWidth,
+                      child: QuickStatCard(
+                        label: HomeStrings.consumptionToday,
+                        value: '${controller.totalTodayWh.toStringAsFixed(0)} Wh',
+                        icon: Icons.energy_savings_leaf_outlined,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
           const SizedBox(height: 22),
           Row(
@@ -249,7 +256,7 @@ class HomePageState extends State<HomePage> {
             children: [
               const Expanded(
                 child: _SectionHeader(
-                  title: 'Tus hogares',
+                  title: HomeStrings.yourHomes,
                   subtitle: '',
                 ),
               ),
@@ -268,34 +275,40 @@ class HomePageState extends State<HomePage> {
             ],
           ),
           const SizedBox(height: 12),
-          if (controller.homes.isEmpty)
-            _EmptyBlock(
+          RepaintBoundary(
+            child: controller.homes.isEmpty
+                ? _EmptyBlock(
               title: HomeStrings.descriptionNewHome,
               subtitle: HomeStrings.warningNewHome,
               icon: Icons.home_outlined,
               actionLabel: HomeStrings.newHome,
-              onAction: controller.creatingHome ? null : showCreateHomeDialog,
+              onAction:
+              controller.creatingHome ? null : showCreateHomeDialog,
             )
-          else
-            ...controller.homes.map(
-                  (home) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: HomeSummaryCard(
-                  name: home.name,
-                  subtitle: home.createdAt == null
-                      ? HomeStrings.createHomeRecently
-                      : 'Creado el ${home.createdAt!.day.toString().padLeft(2, '0')}/${home.createdAt!.month.toString().padLeft(2, '0')}/${home.createdAt!.year}',
-                  icon: Icons.house_siding_rounded,
-                  deleting: controller.deletingId == home.id,
-                  onDelete: controller.deletingId != null
-                      ? null
-                      : () => confirmDeleteHome(
-                    homeId: home.id,
-                    homeName: home.name,
+                : Column(
+              children: controller.homes
+                  .map(
+                    (home) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: HomeSummaryCard(
+                    name: home.name,
+                    subtitle: home.createdAt == null
+                        ? HomeStrings.createHomeRecently
+                        : 'Creado el ${home.createdAt!.day.toString().padLeft(2, '0')}/${home.createdAt!.month.toString().padLeft(2, '0')}/${home.createdAt!.year}',
+                    icon: Icons.house_siding_rounded,
+                    deleting: controller.deletingId == home.id,
+                    onDelete: controller.deletingId != null
+                        ? null
+                        : () => confirmDeleteHome(
+                      homeId: home.id,
+                      homeName: home.name,
+                    ),
                   ),
                 ),
-              ),
+              )
+                  .toList(),
             ),
+          ),
         ],
       ),
     );
@@ -312,23 +325,25 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w800,
+    return RepaintBoundary(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: cs.onSurfaceVariant,
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -352,35 +367,37 @@ class _EmptyBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return GlassCard(
-      child: Column(
-        children: [
-          Icon(icon, size: 42, color: cs.primary),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+    return RepaintBoundary(
+      child: GlassCard(
+        child: Column(
+          children: [
+            Icon(icon, size: 42, color: cs.primary),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: cs.onSurfaceVariant,
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
             ),
-          ),
-          if (actionLabel != null && onAction != null) ...[
-            const SizedBox(height: 14),
-            FilledButton.icon(
-              onPressed: onAction,
-              icon: const Icon(Icons.add_home_outlined),
-              label: Text(actionLabel!),
-            ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: onAction,
+                icon: const Icon(Icons.add_home_outlined),
+                label: Text(actionLabel!),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
