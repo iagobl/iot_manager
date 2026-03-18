@@ -5,6 +5,7 @@ import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
 import 'package:iot_manager/features/devices/presentation/controllers/device_panel_controller.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_info_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_power_panel.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/sections/device_safety_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_settings_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_detail_sidebar.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_metric_card.dart';
@@ -143,6 +144,12 @@ class DevicePanelPageState extends State<DevicePanelPage> {
         rssi: controller.rssi,
         signalQuality: controller.signalQuality,
         uptimeLabel: controller.uptimeLabel,
+      );
+    }
+
+    if (selectedSection == DevicePanelSection.safety) {
+      return DeviceSafetySection(
+        host: widget.device.identifier,
       );
     }
 
