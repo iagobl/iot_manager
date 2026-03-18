@@ -160,6 +160,21 @@ class DevicesRemoteDatasource {
     }
   }
 
+  Future<bool> hasActiveIncidents(String deviceId) async {
+    try {
+      final response = await _client
+          .from('incidents')
+          .select('id')
+          .eq('device_id', deviceId)
+          .eq('is_acknowledged', false)
+          .limit(1);
+
+      return (response as List).isNotEmpty;
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
+    }
+  }
+
   String _requireUserId() {
     final user = _client.auth.currentUser;
     if (user == null) {

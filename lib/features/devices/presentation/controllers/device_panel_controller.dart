@@ -145,6 +145,18 @@ class DevicePanelController extends ChangeNotifier {
     try {
       final nextValue = !_isOn;
 
+      if (nextValue == true) {
+        final hasIncidents =
+        await remoteDatasource.hasActiveIncidents(device.id);
+
+        if (hasIncidents) {
+          _errorMessage =
+          'No se puede encender el dispositivo. Existe una incidencia activa.';
+          notifyListeners();
+          return;
+        }
+      }
+
       await rpcClient.setSwitch(on: nextValue);
       await remoteDatasource.updateDeviceState(device.id, nextValue);
 
