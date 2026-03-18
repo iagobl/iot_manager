@@ -146,12 +146,11 @@ class DevicePanelController extends ChangeNotifier {
       final nextValue = !_isOn;
 
       if (nextValue == true) {
-        final hasIncidents =
-        await remoteDatasource.hasActiveIncidents(device.id);
+        final hasIncidents = await remoteDatasource.hasActiveIncidents(device.id);
 
         if (hasIncidents) {
           _errorMessage =
-          'No se puede encender el dispositivo. Existe una incidencia activa.';
+          'El dispositivo está bloqueado por seguridad. Revisa las incidencias activas.';
           notifyListeners();
           return;
         }

@@ -175,6 +175,30 @@ class DevicesRemoteDatasource {
     }
   }
 
+  Future<List<Map<String, dynamic>>> fetchIncidents({
+    required String deviceId,
+    int limit = 100,
+  }) async {
+    try {
+      if (deviceId.trim().isEmpty) {
+        throw const ValidationAppException(DevicesPanelStrings.notValidIndentifier);
+      }
+
+      final response = await _client
+          .from('incidents')
+          .select()
+          .eq('device_id', deviceId)
+          .order('ts', ascending: false)
+          .limit(limit);
+
+      return (response as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
+    }
+  }
+
   String _requireUserId() {
     final user = _client.auth.currentUser;
     if (user == null) {
