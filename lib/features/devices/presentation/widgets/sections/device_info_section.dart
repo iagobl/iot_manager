@@ -130,7 +130,7 @@ class DeviceInfoSection extends StatelessWidget {
             InfoRowData(
               label: DevicesPanelStrings.recomendatedAction,
               value: needsReboot
-                  ? AppStrings.reboot
+                  ? AppStrings.rebootDevice
                   : hasPendingUpdate
                   ? DevicesPanelStrings.checkUpdate
                   : AppStrings.none,

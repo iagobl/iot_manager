@@ -3,9 +3,7 @@ import 'package:iot_manager/core/constants/devices_panel_strings.dart';
 import 'package:iot_manager/core/constants/devices_strings.dart';
 import 'package:iot_manager/core/error/app_exception.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
-
 import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DevicesRemoteDatasource {
@@ -69,11 +67,82 @@ class DevicesRemoteDatasource {
 
   Future<void> updateDeviceState(String deviceId, bool isActive) async {
     try {
+      if (deviceId.trim().isEmpty) {throw const ValidationAppException(DevicesPanelStrings.notValidIndentifier);
+      }
+
+      await _client
+          .from('devices')
+          .update({'is_active': isActive})
+          .eq('id', deviceId);
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
+    }
+  }
+
+  Future<void> renameDevice({
+    required String deviceId,
+    required String name,
+  }) async {
+    try {
+      final userId = _requireUserId();
+
+      if (deviceId.trim().isEmpty) {
+        throw const ValidationAppException(
+          DevicesPanelStrings.notValidIndentifier,
+        );
+      }
+
+      if (name.trim().isEmpty) {
+        throw const ValidationAppException(DevicesPanelStrings.nameNotNull);
+      }
+
+      await _client
+          .from('devices')
+          .update({'name': name.trim()})
+          .match({'id': deviceId, 'owner_id': userId});
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
+    }
+  }
+
+  Future<void> setDeviceUpdating({
+    required String deviceId,
+    required bool isUpdating,
+  }) async {
+    try {
+      final userId = _requireUserId();
+
       if (deviceId.trim().isEmpty) {
         throw const ValidationAppException(DevicesPanelStrings.notValidIndentifier,);
       }
 
-      await _client.from('devices').update({'is_active': isActive}).eq('id', deviceId);
+      await _client
+          .from('devices')
+          .update({
+        'is_updating': isUpdating,
+        'update_started_at':
+        isUpdating ? DateTime.now().toUtc().toIso8601String() : null,
+      })
+          .match({'id': deviceId, 'owner_id': userId});
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
+    }
+  }
+
+  Future<void> unlinkDevice(String deviceId) async {
+    try {
+      final userId = _requireUserId();
+
+      if (deviceId.trim().isEmpty) {
+        throw const ValidationAppException(
+          DevicesPanelStrings.notValidIndentifier,
+        );
+      }
+
+      await _client
+          .from('devices')
+          .delete()
+          .match({'id': deviceId, 'owner_id': userId});
     } catch (error) {
       throw ErrorMapper.mapException(error);
     }

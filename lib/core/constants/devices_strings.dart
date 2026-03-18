@@ -7,6 +7,7 @@ class DevicesStrings {
   static const on = 'ON';
   static const off = 'OFF';
 
+  static const deviceName = 'Nombre del dispositivo';
   static const notDeviceName = 'El nombre del dispositivo no puede estar vacío';
   static const notDeviceIdentifier = 'La IP o identificador del dispositivo no puede estar vacío';
   static const notShellyinLAN = 'No se han encontrado dispositivos Shelly en la red';

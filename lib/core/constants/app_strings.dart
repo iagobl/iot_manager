@@ -12,13 +12,26 @@ class AppStrings {
   static const exit = 'Cerrar';
   static const ipHost = 'IP o Host';
   static const none = 'Ninguna';
+  static const check = 'Comprobar';
   static const yes = 'Sí';
   static const no = 'No';
+  static const update = 'Actualizar';
+  static const reboot = 'Reiniciar';
+  static const unLink = 'Desvincular';
+  static const factory = 'Restablecer';
 
-  static const reboot = 'Reiniciar dispositivo';
+  static const notAvaliable = 'No disponible';
+  static const saveName = 'Guardar nombre';
+
+  static const rebootDevice = 'Reiniciar dispositivo';
   static const necesaryReboot = 'Reinicio requerido';
   static const recomendedReboot = 'Reinicio recomendado';
+  static const rebootSuccessful = 'Dispositivo reiniciado correctamente';
 
   static const offline = 'Sin conexión';
   static const connected = 'Conectado';
+
+  static const unLinkDevice = 'Desvincular dispositivo';
+  static const unLinkDeviceMessage = 'Se eliminará de la aplicación, pero conservará su configuración de red y seguirá disponible para futuros escaneos';
+  static const unLinkDeviceSucessful = 'Dispositivo desvinculado correctamente';
 }

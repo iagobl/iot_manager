@@ -34,11 +34,13 @@ class ShellyRpcClient {
         if (params != null) 'params': params,
       };
 
-      final res = await _client.post(
+      final res = await _client
+          .post(
         Uri.parse('http://$host/rpc'),
         headers: const {'Content-Type': 'application/json'},
         body: jsonEncode(body),
-      ).timeout(timeout);
+      )
+          .timeout(timeout);
 
       if (res.statusCode < 200 || res.statusCode >= 300) {
         throw ServerAppException(
@@ -95,5 +97,48 @@ class ShellyRpcClient {
 
   Future<void> setSwitch({required bool on, int id = 0,}) async {
     await call('Switch.Set', params: {'id': id, 'on': on});
+  }
+
+  Future<Map<String, dynamic>> getSysConfig() async {
+    return call('Sys.GetConfig');
+  }
+
+  Future<void> setSysConfig({
+    required Map<String, dynamic> config,
+  }) async {
+    await call('Sys.SetConfig', params: {'config': config});
+  }
+
+  Future<Map<String, dynamic>> detectLocation() async {
+    return call('Shelly.DetectLocation');
+  }
+
+  Future<Map<String, dynamic>> checkForUpdate() async {
+    return call('Shelly.CheckForUpdate');
+  }
+
+  Future<void> updateFirmware({String stage = 'stable'}) async {
+    await call('Shelly.Update',
+      params: {'stage': stage},
+      timeout: const Duration(seconds: 8),
+    );
+  }
+
+  Future<void> reboot({int delayMs = 1000}) async {
+    await call('Shelly.Reboot', params: {'delay_ms': delayMs});
+  }
+
+  Future<void> factoryReset() async {
+    await call('Shelly.FactoryReset');
+  }
+
+  Future<Map<String, dynamic>> getPlugsUiConfig() async {
+    return call('PLUGS_UI.GetConfig');
+  }
+
+  Future<void> setPlugsUiConfig({
+    required Map<String, dynamic> config,
+  }) async {
+    await call('PLUGS_UI.SetConfig', params: {'config': config});
   }
 }

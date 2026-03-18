@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:iot_manager/core/constants/devices_panel_strings.dart';
-
+import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
 import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
 import 'package:iot_manager/features/devices/presentation/controllers/device_panel_controller.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_info_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_power_panel.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/sections/device_settings_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_detail_sidebar.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_metric_card.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_panel_styles.dart';
@@ -38,12 +39,20 @@ class DevicePanelPage extends StatefulWidget {
 
 class DevicePanelPageState extends State<DevicePanelPage> {
   late final DevicePanelController controller;
+  late final DevicesRemoteDatasource remoteDatasource;
+  late String currentDeviceName;
+
   DevicePanelSection selectedSection = DevicePanelSection.overview;
 
   @override
   void initState() {
     super.initState();
-    controller = DevicePanelController(device: widget.device);
+    currentDeviceName = widget.device.name;
+    remoteDatasource = DevicesRemoteDatasource();
+    controller = DevicePanelController(
+      device: widget.device,
+      remoteDatasource: remoteDatasource,
+    );
     controller.addListener(onControllerChanged);
     controller.initialize();
   }
@@ -72,7 +81,9 @@ class DevicePanelPageState extends State<DevicePanelPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
               child: DevicePanelTopBar(
-                deviceName: widget.device.name,
+                deviceName: currentDeviceName.length > 18
+                    ? '${currentDeviceName.substring(0, 18)}…'
+                    : currentDeviceName,
                 deviceIdentifier: widget.device.identifier,
                 isLoading: controller.loading,
                 onBack: () => Navigator.of(context).pop(),
@@ -132,6 +143,28 @@ class DevicePanelPageState extends State<DevicePanelPage> {
         rssi: controller.rssi,
         signalQuality: controller.signalQuality,
         uptimeLabel: controller.uptimeLabel,
+      );
+    }
+
+    if (selectedSection == DevicePanelSection.settings) {
+      return DeviceSettingsSection(
+        deviceId: widget.device.id,
+        deviceName: currentDeviceName,
+        host: widget.device.identifier,
+        remoteDatasource: remoteDatasource,
+        onNameChanged: (newName) {
+          setState(() {
+            currentDeviceName = newName;
+          });
+        },
+        onUpdateStarted: () {
+          if (!mounted) return;
+          Navigator.of(context).pop(true);
+        },
+        onDeviceRemoved: () {
+          if (!mounted) return;
+          Navigator.of(context).pop(true);
+        },
       );
     }
 
