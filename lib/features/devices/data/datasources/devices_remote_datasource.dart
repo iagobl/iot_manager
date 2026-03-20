@@ -199,6 +199,93 @@ class DevicesRemoteDatasource {
     }
   }
 
+  Future<List<Map<String, dynamic>>> fetchAutomations({
+    required String deviceId,
+    required String type,
+  }) async {
+    try {
+      final userId = _requireUserId();
+
+      if (deviceId.trim().isEmpty) {
+        throw const ValidationAppException(DevicesPanelStrings.notValidIndentifier);
+      }
+
+      if (type.trim().isEmpty) {
+        throw const ValidationAppException('El tipo de automatización no es válido.');
+      }
+
+      final response = await _client
+          .from('device_automations')
+          .select()
+          .eq('device_id', deviceId)
+          .eq('type', type)
+          .eq('owner_id', userId)
+          .order('created_at', ascending: false);
+
+      return (response as List)
+          .map((item) => Map<String, dynamic>.from(item as Map)).toList();
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
+    }
+  }
+
+  Future<void> upsertAutomation({
+    String? id,
+    required String deviceId,
+    required String type,
+    required bool enabled,
+    required Map<String, dynamic> config,
+  }) async {
+    try {
+      final userId = _requireUserId();
+
+      if (deviceId.trim().isEmpty) {
+        throw const ValidationAppException(
+          DevicesPanelStrings.notValidIndentifier,
+        );
+      }
+
+      if (type.trim().isEmpty) {
+        throw const ValidationAppException('El tipo de automatización no es válido.');
+      }
+
+      final payload = <String, dynamic>{
+        if (id != null && id.trim().isNotEmpty) 'id': id.trim(),
+        'device_id': deviceId,
+        'owner_id': userId,
+        'type': type.trim(),
+        'enabled': enabled,
+        'config': config,
+      };
+
+      await _client.from('device_automations').upsert(payload);
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
+    }
+  }
+
+  Future<void> deleteAutomation({
+    required String automationId,
+  }) async {
+    try {
+      final userId = _requireUserId();
+
+      if (automationId.trim().isEmpty) {
+        throw const ValidationAppException(DevicesPanelStrings.notValidIndentifier);
+      }
+
+      await _client
+          .from('device_automations')
+          .delete()
+          .match({
+        'id': automationId,
+        'owner_id': userId,
+      });
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
+    }
+  }
+
   String _requireUserId() {
     final user = _client.auth.currentUser;
     if (user == null) {

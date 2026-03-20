@@ -8,6 +8,7 @@ import 'package:iot_manager/features/devices/presentation/widgets/sections/devic
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_power_panel.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_safety_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_settings_section.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/sections/device_timer_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_detail_sidebar.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_metric_card.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_panel_styles.dart';
@@ -158,6 +159,18 @@ class DevicePanelPageState extends State<DevicePanelPage> {
     if (selectedSection == DevicePanelSection.light) {
       return DeviceLightSection(
         host: widget.device.identifier,
+      );
+    }
+
+    if (selectedSection == DevicePanelSection.timer) {
+      return DeviceTimerSection(
+        deviceId: widget.device.id,
+        remoteDatasource: remoteDatasource,
+        onExecute: (on) async {
+          if (controller.isOn != on) {
+            await controller.togglePower();
+          }
+        },
       );
     }
 
