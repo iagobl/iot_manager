@@ -13,6 +13,7 @@ import 'package:iot_manager/features/devices/presentation/widgets/shared/device_
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_panel_styles.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_panel_top_bar.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_placeholder_section.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/sections/device_light_section.dart';
 
 enum DevicePanelSection {
   overview,
@@ -150,6 +151,12 @@ class DevicePanelPageState extends State<DevicePanelPage> {
 
     if (selectedSection == DevicePanelSection.safety) {
       return DeviceSafetySection(
+        host: widget.device.identifier,
+      );
+    }
+
+    if (selectedSection == DevicePanelSection.light) {
+      return DeviceLightSection(
         host: widget.device.identifier,
       );
     }
