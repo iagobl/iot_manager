@@ -141,4 +141,64 @@ class ShellyRpcClient {
   }) async {
     await call('PLUGS_UI.SetConfig', params: {'config': config});
   }
+
+
+  Future<List<Map<String, dynamic>>> listSchedules() async {
+    final result = await call('Schedule.List');
+    final jobs = result['jobs'];
+
+    if (jobs is! List) return const [];
+
+    return jobs
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  Future<int> createSchedule({
+    required bool enable,
+    required String timespec,
+    required List<Map<String, dynamic>> calls,
+  }) async {
+    final result = await call(
+      'Schedule.Create',
+      params: {
+        'enable': enable,
+        'timespec': timespec,
+        'calls': calls,
+      },
+    );
+
+    final id = result['id'];
+    if (id is int) return id;
+    if (id is num) return id.toInt();
+    if (id is String) {
+      final parsed = int.tryParse(id);
+      if (parsed != null) return parsed;
+    }
+
+    throw const DeviceAppException(
+      'El Shelly no devolvió un identificador válido para el horario.',
+    );
+  }
+
+  Future<void> updateSchedule({
+    required int id,
+    bool? enable,
+    String? timespec,
+    List<Map<String, dynamic>>? calls,
+  }) async {
+    final params = <String, dynamic>{
+      'id': id,
+      if (enable != null) 'enable': enable,
+      if (timespec != null) 'timespec': timespec,
+      if (calls != null) 'calls': calls,
+    };
+
+    await call('Schedule.Update', params: params);
+  }
+
+  Future<void> deleteSchedule({required int id}) async {
+    await call('Schedule.Delete', params: {'id': id});
+  }
 }
