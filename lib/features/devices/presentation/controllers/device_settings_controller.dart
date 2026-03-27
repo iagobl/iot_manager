@@ -20,6 +20,7 @@ class DeviceSettingsController extends ChangeNotifier {
 
   bool loading = false;
   bool canFactoryReset = false;
+  bool canManageDevice = false;
 
   bool nightModeSupported = false;
   bool nightModeEnabled = false;
@@ -108,10 +109,11 @@ class DeviceSettingsController extends ChangeNotifier {
       final ownerId = (row?['owner_id'] ?? '').toString();
       final currentUserId = _supabase.auth.currentUser?.id ?? '';
 
-      canFactoryReset =
+      canManageDevice =
           ownerId.isNotEmpty &&
               currentUserId.isNotEmpty &&
               ownerId == currentUserId;
+      canFactoryReset = canManageDevice;
     } catch (_) {
       canFactoryReset = false;
     }
@@ -281,6 +283,10 @@ class DeviceSettingsController extends ChangeNotifier {
   }
 
   Future<void> unlinkDevice() async {
+    if (!canManageDevice) {
+      throw Exception('Solo el propietario puede eliminar el dispositivo.');
+    }
+
     if (unlinking) return;
 
     unlinking = true;

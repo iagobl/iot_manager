@@ -192,7 +192,7 @@ class DeviceSchedulesController extends ChangeNotifier {
         await rpcClient.deleteSchedule(id: shellyId);
       }
 
-      await remoteDatasource.deleteAutomation(automationId: automationId);
+      await remoteDatasource.deleteAutomation(automationId);
       await reloadSchedulesSilently();
       return true;
     } catch (err) {

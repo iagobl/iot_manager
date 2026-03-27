@@ -78,7 +78,7 @@ class DeviceIncidentsSectionState extends State<DeviceIncidentsSection> {
           ),
           const SizedBox(height: 14),
           if (controller.incidents.isEmpty)
-            EmptyIncidentsCard()
+            const EmptyIncidentsCard()
           else
             ...controller.incidents.map(buildIncidentCard),
         ],
@@ -258,6 +258,8 @@ class DeviceIncidentsSectionState extends State<DeviceIncidentsSection> {
 }
 
 class EmptyIncidentsCard extends StatelessWidget {
+  const EmptyIncidentsCard({super.key});
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;

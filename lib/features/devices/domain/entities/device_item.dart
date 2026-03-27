@@ -1,5 +1,4 @@
 class DeviceItem {
-
   const DeviceItem({
     required this.id,
     required this.name,
@@ -11,6 +10,9 @@ class DeviceItem {
     required this.homeId,
     required this.roomId,
     required this.energyTodayWh,
+    this.isShared = false,
+    this.shareStatus,
+    this.ownerEmail,
   });
 
   factory DeviceItem.fromMap(Map<String, dynamic> map) {
@@ -24,9 +26,13 @@ class DeviceItem {
       ownerId: map['owner_id'] as String? ?? '',
       homeId: map['home_id'] as String?,
       roomId: map['room_id'] as String?,
-      energyTodayWh: (map['energy_today_wh'] ?? 0).toDouble(),
+      energyTodayWh: ((map['energy_today_wh'] ?? 0) as num).toDouble(),
+      isShared: map['is_shared'] as bool? ?? false,
+      shareStatus: map['share_status'] as String?,
+      ownerEmail: map['owner_email'] as String?,
     );
   }
+
   final String id;
   final String name;
   final String deviceType;
@@ -37,6 +43,9 @@ class DeviceItem {
   final String? homeId;
   final String? roomId;
   final double energyTodayWh;
+  final bool isShared;
+  final String? shareStatus;
+  final String? ownerEmail;
 
   Map<String, dynamic> toMap() {
     return {
@@ -50,6 +59,9 @@ class DeviceItem {
       'home_id': homeId,
       'room_id': roomId,
       'energy_today_wh': energyTodayWh,
+      'is_shared': isShared,
+      'share_status': shareStatus,
+      'owner_email': ownerEmail,
     };
   }
 }

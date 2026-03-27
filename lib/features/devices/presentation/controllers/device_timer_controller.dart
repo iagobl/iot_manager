@@ -84,7 +84,7 @@ class DeviceTimerController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await remoteDatasource.deleteAutomation(automationId: automationId);
+      await remoteDatasource.deleteAutomation(automationId);
       await load();
     } catch (err) {
       final failure = ErrorMapper.mapFailure(err);

@@ -684,45 +684,47 @@ class _DeviceSettingsSectionState extends State<DeviceSettingsSection> {
           ),
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            style: uniformOutlinedStyle,
-            onPressed: _controller.unlinking
-                ? null
-                : () async {
-              final confirmed = await _showConfirmDialog(
-                title: AppStrings.unLinkDevice,
-                message: AppStrings.unLinkDeviceMessage,
-                confirmText: AppStrings.unLink,
-                danger: false,
-              );
+        if (_controller.canManageDevice) ...[
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: uniformOutlinedStyle,
+              onPressed: _controller.unlinking
+                  ? null
+                  : () async {
+                final confirmed = await _showConfirmDialog(
+                  title: AppStrings.unLinkDevice,
+                  message: AppStrings.unLinkDeviceMessage,
+                  confirmText: AppStrings.unLink,
+                  danger: false,
+                );
 
-              if (confirmed != true) return;
+                if (confirmed != true) return;
 
-              try {
-                await _controller.unlinkDevice();
-                _showSnack(AppStrings.unLinkDeviceSucessful);
-                widget.onDeviceRemoved?.call();
-              } catch (error) {
-                _showSnack(_messageFromError(error));
-              }
-            },
-            icon: _controller.unlinking
-                ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-                : const Icon(Icons.link_off_rounded, size: 18),
-            label: const Text(
-              AppStrings.unLinkDevice,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+                try {
+                  await _controller.unlinkDevice();
+                  _showSnack(AppStrings.unLinkDeviceSucessful);
+                  widget.onDeviceRemoved?.call();
+                } catch (error) {
+                  _showSnack(_messageFromError(error));
+                }
+              },
+              icon: _controller.unlinking
+                  ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+                  : const Icon(Icons.link_off_rounded, size: 18),
+              label: const Text(
+                AppStrings.unLinkDevice,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
+        ],
         if (_controller.canFactoryReset)
           SizedBox(
             width: double.infinity,

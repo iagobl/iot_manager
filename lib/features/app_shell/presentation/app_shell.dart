@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-
 import 'package:iot_manager/app/routes.dart';
 import 'package:iot_manager/core/widgets/app_background.dart';
-
 import 'package:iot_manager/features/analytics/presentation/pages/analytics_page.dart';
+import 'package:iot_manager/features/app_shell/presentation/controllers/notifications_controller.dart';
+import 'package:iot_manager/features/app_shell/presentation/widgets/device_notifications_sheet.dart';
 import 'package:iot_manager/features/app_shell/presentation/widgets/shell_top_bar.dart';
 import 'package:iot_manager/features/devices/presentation/pages/devices_page.dart';
 import 'package:iot_manager/features/home/presentation/pages/home_page.dart';
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppShell extends StatefulWidget {
@@ -19,18 +18,40 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int currentIndex = 0;
+  int devicesRefreshKey = 0;
 
-  static const _pages = [
-    HomePage(),
-    AnalyticsPage(),
-    DevicesPage(),
-  ];
+  late final NotificationsController notificationsController;
 
   static const _titles = [
     ('Inicio', 'Resumen general de tu instalación'),
     ('Gráficas', 'Visualización de consumos y actividad'),
     ('Dispositivos', 'Listado de dispositivos asociados'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    notificationsController = NotificationsController()..addListener(rebuild);
+    notificationsController.load();
+  }
+
+  @override
+  void dispose() {
+    notificationsController.removeListener(rebuild);
+    notificationsController.dispose();
+    super.dispose();
+  }
+
+  void rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  void refreshDevicesTab() {
+    if (!mounted) return;
+    setState(() {
+      devicesRefreshKey++;
+    });
+  }
 
   Future<void> _logout() async {
     await Supabase.instance.client.auth.signOut();
@@ -43,11 +64,53 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  Future<void> openNotifications() async {
+    await notificationsController.load();
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => FractionallySizedBox(
+        heightFactor: 0.72,
+        child: DeviceNotificationsSheet(
+          controller: notificationsController,
+          onInvitationsChanged: () async {
+            await notificationsController.load();
+            refreshDevicesTab();
+          },
+        ),
+      ),
+    );
+  }
+
+  List<Widget> buildPages() {
+    return [
+      const HomePage(),
+      const AnalyticsPage(),
+      DevicesPage(
+        key: ValueKey(devicesRefreshKey),
+      ),
+    ];
+  }
+
+  void onDestinationSelected(int index) {
+    setState(() {
+      currentIndex = index;
+
+      if (index == 2) {
+        devicesRefreshKey++;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final title = _titles[currentIndex].$1;
     final subtitle = _titles[currentIndex].$2;
+    final pages = buildPages();
 
     return Scaffold(
       extendBody: true,
@@ -58,11 +121,13 @@ class _AppShellState extends State<AppShell> {
               title: title,
               subtitle: subtitle,
               onLogout: _logout,
+              notificationsCount: notificationsController.pendingCount,
+              onNotificationsTap: openNotifications,
             ),
             Expanded(
               child: IndexedStack(
                 index: currentIndex,
-                children: _pages,
+                children: pages,
               ),
             ),
           ],
@@ -91,10 +156,7 @@ class _AppShellState extends State<AppShell> {
             indicatorColor: cs.primary.withValues(alpha: 0.14),
             labelBehavior:
             NavigationDestinationLabelBehavior.onlyShowSelected,
-            onDestinationSelected: (index) {
-              if (currentIndex == index) return;
-              setState(() => currentIndex = index);
-            },
+            onDestinationSelected: onDestinationSelected,
             destinations: const [
               NavigationDestination(
                 icon: Icon(Icons.home_outlined),

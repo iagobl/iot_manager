@@ -8,6 +8,7 @@ import 'package:iot_manager/features/devices/presentation/widgets/sections/devic
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_light_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_power_panel.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_safety_section.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/sections/device_share_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_schedules_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_settings_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_timer_section.dart';
@@ -209,6 +210,14 @@ class DevicePanelPageState extends State<DevicePanelPage> {
           if (!mounted) return;
           Navigator.of(context).pop(true);
         },
+      );
+    }
+
+    if (selectedSection == DevicePanelSection.share) {
+      return DeviceShareSection(
+        deviceId: widget.device.id,
+        deviceName: currentDeviceName,
+        remoteDatasource: remoteDatasource,
       );
     }
 
