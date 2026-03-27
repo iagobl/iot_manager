@@ -758,6 +758,36 @@ class DevicesRemoteDatasource {
     }
   }
 
+  Future<List<Map<String, dynamic>>> fetchReadingsRange({
+    required String deviceId,
+    required DateTime from,
+    required DateTime to,
+    int limit = 10000,
+  }) async {
+    try {
+      final normalizedDeviceId = deviceId.trim();
+
+      if (normalizedDeviceId.isEmpty) {
+        throw const ValidationAppException('No se ha encontrado un identificador válido del dispositivo.');
+      }
+
+      final response = await _client
+          .from('readings')
+          .select('ts, power_w, voltage_v, energy_wh')
+          .eq('device_id', normalizedDeviceId)
+          .gte('ts', from.toUtc().toIso8601String())
+          .lte('ts', to.toUtc().toIso8601String())
+          .order('ts', ascending: true)
+          .limit(limit);
+
+      return (response as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
+    }
+  }
+
   String _requireUserId() {
     final userId = _client.auth.currentUser?.id;
     if (userId == null || userId.isEmpty) {

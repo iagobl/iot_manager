@@ -3,14 +3,15 @@ import 'package:iot_manager/core/constants/devices_panel_strings.dart';
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
 import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
 import 'package:iot_manager/features/devices/presentation/controllers/device_panel_controller.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/sections/device_charts_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_incidents_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_info_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_light_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_power_panel.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_safety_section.dart';
-import 'package:iot_manager/features/devices/presentation/widgets/sections/device_share_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_schedules_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_settings_section.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/sections/device_share_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_timer_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_detail_sidebar.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/shared/device_metric_card.dart';
@@ -161,6 +162,15 @@ class DevicePanelPageState extends State<DevicePanelPage> {
     if (selectedSection == DevicePanelSection.light) {
       return DeviceLightSection(
         host: widget.device.identifier,
+      );
+    }
+
+    if (selectedSection == DevicePanelSection.charts) {
+      return DeviceChartsSection(
+        deviceId: widget.device.id,
+        deviceName: currentDeviceName,
+        deviceHost: widget.device.identifier,
+        remoteDatasource: remoteDatasource,
       );
     }
 
