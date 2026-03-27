@@ -167,7 +167,7 @@ class DeviceNotificationsSheetState extends State<DeviceNotificationsSheet> {
 }
 
 class InvitationCard extends StatelessWidget {
-  const InvitationCard({
+  const InvitationCard({super.key,
     required this.item,
     required this.deviceTypeLabel,
     required this.deviceIcon,
@@ -269,7 +269,7 @@ class InvitationCard extends StatelessWidget {
 }
 
 class EmptyState extends StatelessWidget {
-  const EmptyState({this.errorMessage});
+  const EmptyState({super.key, this.errorMessage});
 
   final String? errorMessage;
 

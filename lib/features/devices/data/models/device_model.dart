@@ -35,8 +35,4 @@ class DeviceModel extends DeviceItem {
     );
   }
 
-  @override
-  Map<String, dynamic> toMap() {
-    return super.toMap();
-  }
 }

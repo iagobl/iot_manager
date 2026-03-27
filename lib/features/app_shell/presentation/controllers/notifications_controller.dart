@@ -5,7 +5,7 @@ import 'package:iot_manager/features/devices/data/datasources/devices_remote_dat
 
 class NotificationsController extends ChangeNotifier {
   NotificationsController({DevicesRemoteDatasource? remoteDatasource})
-      : this.remoteDatasource = remoteDatasource ?? DevicesRemoteDatasource();
+      : remoteDatasource = remoteDatasource ?? DevicesRemoteDatasource();
 
   final DevicesRemoteDatasource remoteDatasource;
 

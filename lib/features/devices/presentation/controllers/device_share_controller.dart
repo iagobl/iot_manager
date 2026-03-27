@@ -10,8 +10,8 @@ class DeviceShareController extends ChangeNotifier {
     required this.deviceName,
     DevicesRemoteDatasource? remoteDatasource,
     SupabaseClient? supabase,
-  })  : this.remoteDatasource = remoteDatasource ?? DevicesRemoteDatasource(),
-        this.supabase = supabase ?? Supabase.instance.client;
+  })  : remoteDatasource = remoteDatasource ?? DevicesRemoteDatasource(),
+        supabase = supabase ?? Supabase.instance.client;
 
   final String deviceId;
   final String deviceName;

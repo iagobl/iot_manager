@@ -220,7 +220,7 @@ class DeviceShareSectionState extends State<DeviceShareSection> {
 }
 
 class InviteCard extends StatelessWidget {
-  const InviteCard({
+  const InviteCard({super.key,
     required this.emailController,
     required this.loading,
     required this.onInvite,
@@ -288,7 +288,7 @@ class InviteCard extends StatelessWidget {
 }
 
 class ReadOnlySharedCard extends StatelessWidget {
-  const ReadOnlySharedCard();
+  const ReadOnlySharedCard({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -332,7 +332,7 @@ class ReadOnlySharedCard extends StatelessWidget {
 }
 
 class EmptyCard extends StatelessWidget {
-  const EmptyCard({required this.text});
+  const EmptyCard({super.key, required this.text});
 
   final String text;
 
@@ -357,7 +357,7 @@ class EmptyCard extends StatelessWidget {
 }
 
 class ShareEntryCard extends StatelessWidget {
-  const ShareEntryCard({
+  const ShareEntryCard({super.key,
     required this.entry,
     required this.isOwner,
     required this.busy,
@@ -498,7 +498,7 @@ class ShareEntryCard extends StatelessWidget {
 }
 
 class StatusChip extends StatelessWidget {
-  const StatusChip({
+  const StatusChip({super.key,
     required this.label,
     required this.color,
   });
