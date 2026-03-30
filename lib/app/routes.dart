@@ -5,6 +5,7 @@ import 'package:iot_manager/features/auth/presentation/pages/auth_gate.dart';
 import 'package:iot_manager/features/auth/presentation/pages/forgot_password_page.dart';
 import 'package:iot_manager/features/auth/presentation/pages/login_page.dart';
 import 'package:iot_manager/features/auth/presentation/pages/register_page.dart';
+import 'package:iot_manager/features/profile/presentation/pages/profile_page.dart';
 
 class Routes {
   static const authGate = '/';
@@ -12,6 +13,7 @@ class Routes {
   static const register = '/register';
   static const forgotPassword = '/forgot-password';
   static const home = '/home';
+  static const profile = '/profile';
 }
 
 class AppRouter {
@@ -44,6 +46,12 @@ class AppRouter {
       case Routes.home:
         return MaterialPageRoute(
           builder: (_) => const AppShell(),
+          settings: settings,
+        );
+
+      case Routes.profile:
+        return MaterialPageRoute(
+          builder: (_) => const ProfilePage(),
           settings: settings,
         );
 

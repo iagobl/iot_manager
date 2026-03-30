@@ -6,7 +6,6 @@ import 'package:iot_manager/core/error/error_mapper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthRemoteDatasource {
-
   AuthRemoteDatasource(this._client);
   final SupabaseClient _client;
 
@@ -51,6 +50,18 @@ class AuthRemoteDatasource {
         'id': userId,
         'first_name': firstName.trim(),
         'last_name': lastName.trim(),
+        'email': email.trim(),
+        'avatar_url': null,
+        'unit_preferences': {
+          'energy': 'kWh',
+          'power': 'W',
+          'voltage': 'V',
+        },
+        'notification_preferences': {
+          'incidents': true,
+          'device_status': true,
+          'sharing': true,
+        },
       }).timeout(const Duration(seconds: 15));
     } on TimeoutException {
       throw const TimeoutAppException(

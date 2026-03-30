@@ -64,6 +64,12 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  Future<void> _openProfile() async {
+    await Navigator.of(context).pushNamed(Routes.profile);
+    if (!mounted) return;
+    setState(() {});
+  }
+
   Future<void> openNotifications() async {
     await notificationsController.load();
     if (!mounted) return;
@@ -121,6 +127,7 @@ class _AppShellState extends State<AppShell> {
               title: title,
               subtitle: subtitle,
               onLogout: _logout,
+              onProfileTap: _openProfile,
               notificationsCount: notificationsController.pendingCount,
               onNotificationsTap: openNotifications,
             ),
@@ -154,8 +161,7 @@ class _AppShellState extends State<AppShell> {
             backgroundColor: Colors.transparent,
             selectedIndex: currentIndex,
             indicatorColor: cs.primary.withValues(alpha: 0.14),
-            labelBehavior:
-            NavigationDestinationLabelBehavior.onlyShowSelected,
+            labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
             onDestinationSelected: onDestinationSelected,
             destinations: const [
               NavigationDestination(

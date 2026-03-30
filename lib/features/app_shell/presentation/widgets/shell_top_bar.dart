@@ -7,6 +7,7 @@ class ShellTopBar extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.onLogout,
+    this.onProfileTap,
     this.notificationsCount = 0,
     this.onNotificationsTap,
   });
@@ -14,6 +15,7 @@ class ShellTopBar extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback? onLogout;
+  final VoidCallback? onProfileTap;
   final int notificationsCount;
   final VoidCallback? onNotificationsTap;
 
@@ -79,7 +81,11 @@ class ShellTopBar extends StatelessWidget {
             child: PopupMenuButton<String>(
               tooltip: 'Perfil',
               onSelected: (value) {
-                if (value == 'logout') onLogout?.call();
+                if (value == 'profile') {
+                  onProfileTap?.call();
+                } else if (value == 'logout') {
+                  onLogout?.call();
+                }
               },
               icon: const Icon(Icons.person_outline_rounded),
               itemBuilder: (context) => const [
@@ -89,6 +95,16 @@ class ShellTopBar extends StatelessWidget {
                   child: Text(AppStrings.appName),
                 ),
                 PopupMenuDivider(),
+                PopupMenuItem<String>(
+                  value: 'profile',
+                  child: Row(
+                    children: [
+                      Icon(Icons.account_circle_outlined),
+                      SizedBox(width: 10),
+                      Text('Mi perfil'),
+                    ],
+                  ),
+                ),
                 PopupMenuItem<String>(
                   value: 'logout',
                   child: Row(
