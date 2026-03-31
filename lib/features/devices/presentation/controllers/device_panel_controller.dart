@@ -348,7 +348,11 @@ class DevicePanelController extends ChangeNotifier {
 
       _autoShutdownIncidentRecorded = true;
       _lastAutoShutdownKey = incidentKey;
-    } catch (_) { }
+    } catch (error) {
+      final failure = ErrorMapper.mapFailure(error);
+      _errorMessage = failure.message;
+      notifyListeners();
+    }
   }
 
   Map<String, Object> buildAutomaticShutdownIncident(

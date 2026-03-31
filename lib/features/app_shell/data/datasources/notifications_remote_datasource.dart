@@ -128,19 +128,55 @@ class NotificationsRemoteDatasource {
       final ownedDevices = (ownedDevicesResponse as List)
           .map((item) => Map<String, dynamic>.from(item as Map)).toList();
 
-      if (ownedDevices.isEmpty) {
+      final sharedRowsResponse = await _client
+          .from('device_shares')
+          .select('device_id')
+          .eq('shared_with_user_id', userId)
+          .eq('status', 'accepted');
+
+      final sharedRows = (sharedRowsResponse as List)
+          .map((item) => Map<String, dynamic>.from(item as Map)).toList();
+
+      final sharedDeviceIds = sharedRows.map((row) => (row['device_id'] ?? '').toString())
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
+
+      final List<Map<String, dynamic>> sharedDevices = [];
+      if (sharedDeviceIds.isNotEmpty) {
+        final sharedDevicesResponse = await _client
+            .from('devices')
+            .select('id, name, device_type, home_id')
+            .inFilter('id', sharedDeviceIds);
+
+        sharedDevices.addAll((sharedDevicesResponse as List)
+            .map((item) => Map<String, dynamic>.from(item as Map)));
+      }
+
+      final allDevices = <Map<String, dynamic>>[
+        ...ownedDevices,
+        ...sharedDevices,
+      ];
+
+      if (allDevices.isEmpty) {
         return <Map<String, dynamic>>[];
       }
 
-      final deviceIds = ownedDevices.map((row) => (row['id'] ?? '').toString())
+      final deviceById = <String, Map<String, dynamic>>{
+        for (final row in allDevices) (row['id'] ?? '').toString(): row,
+      };
+
+      final deviceIds = deviceById.keys
           .where((id) => id.isNotEmpty)
           .toList();
 
-      final deviceById = <String, Map<String, dynamic>>{
-        for (final row in ownedDevices) (row['id'] ?? '').toString(): row,
-      };
+      if (deviceIds.isEmpty) {
+        return <Map<String, dynamic>>[];
+      }
 
-      final incidentsResponse = await _client.from('incidents').select(
+      final incidentsResponse = await _client
+          .from('incidents')
+          .select(
         'id, device_id, home_id, ts, type, severity, message, is_acknowledged, is_resolved',
       )
           .inFilter('device_id', deviceIds)
