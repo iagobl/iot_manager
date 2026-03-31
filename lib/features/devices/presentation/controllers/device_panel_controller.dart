@@ -153,10 +153,20 @@ class DevicePanelController extends ChangeNotifier {
 
     try {
       if (nextValue) {
-        final activeIncident = await remoteDatasource.getLatestActiveIncident(device.id);
+        final blockedFailure = await getCurrentSafetyBlockFailure();
+        if (blockedFailure != null) {
+          _errorMessage = blockedFailure.message;
+          notifyListeners();
+          return;
+        }
 
-        if (activeIncident != null) {
-          final failure = ErrorMapper.mapFailure(Exception(mapIncidentTypeToErrorKey(activeIncident)));
+        final activeIncident =
+        await remoteDatasource.getLatestActiveIncident(device.id);
+
+        if (activeIncident != null && isSpecificBlockingIncident(activeIncident)) {
+          final failure = ErrorMapper.mapFailure(
+            Exception(mapIncidentTypeToErrorKey(activeIncident)),
+          );
           _errorMessage = failure.message;
           notifyListeners();
           return;
@@ -185,6 +195,68 @@ class DevicePanelController extends ChangeNotifier {
       _busyPowerAction = false;
       notifyListeners();
     }
+  }
+
+  Future<SafetyBlockResult?> getCurrentSafetyBlockFailure() async {
+    try {
+      final switchStatus = await rpcClient.getSwitchStatus();
+      final config = await rpcClient.call('Switch.GetConfig', params: {'id': 0});
+
+      final currentVoltage = readDouble(switchStatus, const ['voltage']);
+      final currentPower = readDouble(switchStatus, const ['apower', 'power']);
+      final currentCurrent = readDouble(switchStatus, const ['current']);
+
+      final voltageLimit = _toDouble(config['voltage_limit']);
+      final powerLimit = _toDouble(config['power_limit']);
+      final currentLimit = _toDouble(config['current_limit']);
+
+      if (voltageLimit != null &&
+          voltageLimit > 0 &&
+          currentVoltage > 0 &&
+          currentVoltage > voltageLimit) {
+        return SafetyBlockResult(
+          type: 'overvoltage',
+          message: ErrorMapper.mapFailure(Exception('overvoltage')).message,
+        );
+      }
+
+      if (powerLimit != null &&
+          powerLimit > 0 &&
+          currentPower > 0 &&
+          currentPower > powerLimit) {
+        return SafetyBlockResult(
+          type: 'overpower',
+          message: ErrorMapper.mapFailure(Exception('overpower')).message,
+        );
+      }
+
+      if (currentLimit != null &&
+          currentLimit > 0 &&
+          currentCurrent > 0 &&
+          currentCurrent > currentLimit) {
+        return SafetyBlockResult(
+          type: 'overcurrent',
+          message: ErrorMapper.mapFailure(Exception('overcurrent')).message,
+        );
+      }
+
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool isSpecificBlockingIncident(Map<String, dynamic> incident) {
+    final type = (incident['type'] ?? '').toString().toLowerCase().trim();
+
+    return type.contains('overvoltage') ||
+        type.contains('voltage') ||
+        type.contains('overpower') ||
+        type.contains('power') ||
+        type.contains('overcurrent') ||
+        type.contains('current') ||
+        type.contains('overtemperature') ||
+        type.contains('temperature');
   }
 
   void startPolling() {
@@ -222,6 +294,7 @@ class DevicePanelController extends ChangeNotifier {
 
   void applySwitchStatus(Map<String, dynamic> switchStatus) {
     final wasOn = _isOn;
+
     _isOn = readBool(switchStatus, const ['output']);
     _powerW = readDouble(switchStatus, const ['apower', 'power']);
     _voltageV = readDouble(switchStatus, const ['voltage']);
@@ -247,11 +320,11 @@ class DevicePanelController extends ChangeNotifier {
     }
 
     if (wasOn && !_isOn && !_manualPowerOffInProgress) {
-      unawaited(_recordAutomaticShutdownIncidentIfNeeded());
+      unawaited(recordAutomaticShutdownIncidentIfNeeded());
     }
   }
 
-  Future<void> _recordAutomaticShutdownIncidentIfNeeded() async {
+  Future<void> recordAutomaticShutdownIncidentIfNeeded() async {
     if (_autoShutdownIncidentRecorded) return;
 
     try {
@@ -260,7 +333,7 @@ class DevicePanelController extends ChangeNotifier {
         params: {'id': 0},
       );
 
-      final incident = _buildAutomaticShutdownIncident(config);
+      final incident = buildAutomaticShutdownIncident(config);
       final incidentKey = incident['key']?.toString();
 
       if (incidentKey == null || incidentKey.isEmpty) return;
@@ -275,10 +348,10 @@ class DevicePanelController extends ChangeNotifier {
 
       _autoShutdownIncidentRecorded = true;
       _lastAutoShutdownKey = incidentKey;
-    } catch (_) {    }
+    } catch (_) { }
   }
 
-  Map<String, Object> _buildAutomaticShutdownIncident(
+  Map<String, Object> buildAutomaticShutdownIncident(
       Map<String, dynamic> config,
       ) {
     final voltageLimit = _toDouble(config['voltage_limit']);
@@ -553,4 +626,14 @@ class DevicePanelController extends ChangeNotifier {
     pollTimer?.cancel();
     super.dispose();
   }
+}
+
+class SafetyBlockResult {
+  const SafetyBlockResult({
+    required this.type,
+    required this.message,
+  });
+
+  final String type;
+  final String message;
 }

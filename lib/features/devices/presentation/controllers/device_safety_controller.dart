@@ -53,10 +53,7 @@ class DeviceSafetyController extends ChangeNotifier {
     try {
       await saveField('power_limit', value);
       powerLimit = value;
-      await resolveIncidentsIfNeeded(
-        changedKey: 'power_limit',
-        newLimit: value,
-      );
+      await resolveIncidentsIfNeeded(changedKey: 'power_limit', newLimit: value);
       error = null;
     } catch (e) {
       error = e.toString();
