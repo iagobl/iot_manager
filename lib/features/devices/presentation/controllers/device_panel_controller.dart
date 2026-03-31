@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:iot_manager/core/constants/devices_panel_strings.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
+import 'package:iot_manager/core/iot/shelly/shelly_rpc_client.dart';
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
 import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
-import 'package:iot_manager/core/iot/shelly/shelly_rpc_client.dart';
 
 class DevicePanelController extends ChangeNotifier {
   DevicePanelController({
@@ -30,6 +30,14 @@ class DevicePanelController extends ChangeNotifier {
   double _temperatureC = 0;
   double _energyTodayWh = 0;
   double _frequencyHz = 0;
+
+  double _lastOnPowerW = 0;
+  double _lastOnVoltageV = 0;
+  double _lastOnCurrentA = 0;
+
+  bool _manualPowerOffInProgress = false;
+  bool _autoShutdownIncidentRecorded = false;
+  String? _lastAutoShutdownKey;
 
   String _deviceHost = '-';
   String _deviceIp = '-';
@@ -141,18 +149,23 @@ class DevicePanelController extends ChangeNotifier {
     _busyPowerAction = true;
     notifyListeners();
 
+    final nextValue = !_isOn;
+
     try {
-      final nextValue = !_isOn;
-
       if (nextValue) {
-        final hasIncidents = await remoteDatasource.hasActiveIncidents(device.id);
+        final activeIncident = await remoteDatasource.getLatestActiveIncident(device.id);
 
-        if (hasIncidents) {
-          final failure = ErrorMapper.mapFailure(Exception('device_blocked_by_incidents'),);
+        if (activeIncident != null) {
+          final failure = ErrorMapper.mapFailure(Exception(_mapIncidentTypeToErrorKey(activeIncident)));
           _errorMessage = failure.message;
           notifyListeners();
           return;
         }
+
+        _autoShutdownIncidentRecorded = false;
+        _lastAutoShutdownKey = null;
+      } else {
+        _manualPowerOffInProgress = true;
       }
 
       await rpcClient.setSwitch(on: nextValue);
@@ -168,6 +181,7 @@ class DevicePanelController extends ChangeNotifier {
       _errorMessage = failure.message;
       notifyListeners();
     } finally {
+      _manualPowerOffInProgress = false;
       _busyPowerAction = false;
       notifyListeners();
     }
@@ -175,9 +189,7 @@ class DevicePanelController extends ChangeNotifier {
 
   void startPolling() {
     pollTimer?.cancel();
-    pollTimer = Timer.periodic(
-      const Duration(seconds: 5), (_) => unawaited(refreshSilently()),
-    );
+    pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(refreshSilently()));
   }
 
   Future<void> refreshSilently() async {
@@ -209,6 +221,7 @@ class DevicePanelController extends ChangeNotifier {
   }
 
   void applySwitchStatus(Map<String, dynamic> switchStatus) {
+    final wasOn = _isOn;
     _isOn = readBool(switchStatus, const ['output']);
     _powerW = readDouble(switchStatus, const ['apower', 'power']);
     _voltageV = readDouble(switchStatus, const ['voltage']);
@@ -224,6 +237,120 @@ class DevicePanelController extends ChangeNotifier {
     }
 
     _frequencyHz = readDouble(switchStatus, const ['freq', 'frequency']);
+
+    if (_isOn) {
+      _lastOnPowerW = _powerW;
+      _lastOnVoltageV = _voltageV;
+      _lastOnCurrentA = _currentA;
+      _autoShutdownIncidentRecorded = false;
+      _lastAutoShutdownKey = null;
+    }
+
+    if (wasOn && !_isOn && !_manualPowerOffInProgress) {
+      unawaited(_recordAutomaticShutdownIncidentIfNeeded());
+    }
+  }
+
+  Future<void> _recordAutomaticShutdownIncidentIfNeeded() async {
+    if (_autoShutdownIncidentRecorded) return;
+
+    try {
+      final config = await rpcClient.call(
+        'Switch.GetConfig',
+        params: {'id': 0},
+      );
+
+      final incident = _buildAutomaticShutdownIncident(config);
+      final incidentKey = incident['key']?.toString();
+
+      if (incidentKey == null || incidentKey.isEmpty) return;
+      if (_lastAutoShutdownKey == incidentKey) return;
+
+      await remoteDatasource.insertIncident(
+        deviceId: device.id,
+        type: incident['type']!.toString(),
+        message: incident['message']!.toString(),
+        severity: incident['severity'] as int? ?? 3,
+      );
+
+      _autoShutdownIncidentRecorded = true;
+      _lastAutoShutdownKey = incidentKey;
+    } catch (_) {}
+  }
+
+  Map<String, Object> _buildAutomaticShutdownIncident(
+      Map<String, dynamic> config,
+      ) {
+    final voltageLimit = _toDouble(config['voltage_limit']);
+    final powerLimit = _toDouble(config['power_limit']);
+    final currentLimit = _toDouble(config['current_limit']);
+
+    if (voltageLimit != null &&
+        voltageLimit > 0 &&
+        _lastOnVoltageV > voltageLimit) {
+      return {
+        'key':
+        'overvoltage:${_formatNumber(_lastOnVoltageV)}:${_formatNumber(voltageLimit)}',
+        'type': 'overvoltage',
+        'message':
+        'El dispositivo se apagó automáticamente porque la tensión alcanzó ${_formatNumber(_lastOnVoltageV)} V y superó el límite configurado de ${_formatNumber(voltageLimit)} V.',
+        'severity': 3,
+      };
+    }
+
+    if (powerLimit != null && powerLimit > 0 && _lastOnPowerW > powerLimit) {
+      return {
+        'key':
+        'overpower:${_formatNumber(_lastOnPowerW)}:${_formatNumber(powerLimit)}',
+        'type': 'overpower',
+        'message':
+        'El dispositivo se apagó automáticamente porque la potencia alcanzó ${_formatNumber(_lastOnPowerW)} W y superó el límite configurado de ${_formatNumber(powerLimit)} W.',
+        'severity': 3,
+      };
+    }
+
+    if (currentLimit != null &&
+        currentLimit > 0 &&
+        _lastOnCurrentA > currentLimit) {
+      return {
+        'key':
+        'overcurrent:${_formatNumber(_lastOnCurrentA)}:${_formatNumber(currentLimit)}',
+        'type': 'overcurrent',
+        'message':
+        'El dispositivo se apagó automáticamente porque la corriente alcanzó ${_formatNumber(_lastOnCurrentA)} A y superó el límite configurado de ${_formatNumber(currentLimit)} A.',
+        'severity': 3,
+      };
+    }
+
+    return {
+      'key': 'safety_shutdown',
+      'type': 'safety_shutdown',
+      'message':
+      'El dispositivo se apagó automáticamente por una condición de seguridad.',
+      'severity': 3,
+    };
+  }
+
+  String _mapIncidentTypeToErrorKey(Map<String, dynamic> incident) {
+    final type = (incident['type'] ?? '').toString().toLowerCase().trim();
+
+    if (type.contains('overvoltage') || type.contains('voltage')) {
+      return 'overvoltage';
+    }
+
+    if (type.contains('overpower') || type.contains('power')) {
+      return 'overpower';
+    }
+
+    if (type.contains('overcurrent') || type.contains('current')) {
+      return 'overcurrent';
+    }
+
+    if (type.contains('temperature')) {
+      return 'overtemperature';
+    }
+
+    return 'device_blocked_by_incidents';
   }
 
   void applyDeviceInfo(Map<String, dynamic> deviceInfo) {
@@ -391,6 +518,24 @@ class DevicePanelController extends ChangeNotifier {
     }
 
     return current;
+  }
+
+  double? _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+
+    if (value is String) {
+      return double.tryParse(value.replaceAll(',', '.'));
+    }
+
+    return null;
+  }
+
+  String _formatNumber(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+
+    return value.toStringAsFixed(1);
   }
 
   void setLoading(bool value) {

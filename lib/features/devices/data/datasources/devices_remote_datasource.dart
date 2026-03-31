@@ -651,6 +651,59 @@ class DevicesRemoteDatasource {
     }
   }
 
+  Future<Map<String, dynamic>?> getLatestActiveIncident(String deviceId) async {
+    try {
+      final normalizedId = deviceId.trim();
+
+      if (normalizedId.isEmpty) {
+        throw const ValidationAppException('No se ha encontrado un identificador válido del dispositivo.');
+      }
+
+      final response = await _client
+          .from('incidents')
+          .select()
+          .eq('device_id', normalizedId)
+          .eq('is_acknowledged', false)
+          .order('ts', ascending: false)
+          .limit(1);
+
+      final rows = (response as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+
+      if (rows.isEmpty) return null;
+      return rows.first;
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
+    }
+  }
+
+  Future<void> insertIncident({
+    required String deviceId,
+    required String type,
+    required String message,
+    int severity = 3,
+  }) async {
+    try {
+      final normalizedDeviceId = deviceId.trim();
+
+      if (normalizedDeviceId.isEmpty) {
+        throw const ValidationAppException('No se ha encontrado un identificador válido del dispositivo.');
+      }
+
+      await _client.from('incidents').insert({
+        'device_id': normalizedDeviceId,
+        'type': type.trim(),
+        'message': message.trim(),
+        'severity': severity,
+        'is_acknowledged': false,
+        'ts': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
+    }
+  }
+
   Future<List<Map<String, dynamic>>> fetchIncidents({
     required String deviceId,
     int limit = 100,
