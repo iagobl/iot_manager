@@ -1,19 +1,43 @@
 import 'package:flutter/foundation.dart';
 import 'package:iot_manager/core/error/app_exception.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
-import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
+import 'package:iot_manager/features/app_shell/data/repositories/notifications_repository_impl.dart';
+import 'package:iot_manager/features/app_shell/domain/entities/app_notification.dart';
+import 'package:iot_manager/features/app_shell/domain/entities/device_incident_notification.dart';
+import 'package:iot_manager/features/app_shell/domain/entities/device_invitation_notification.dart';
+import 'package:iot_manager/features/app_shell/domain/repositories/notifications_repository.dart';
+import 'package:iot_manager/features/app_shell/domain/usecases/accept_invitation_notification.dart';
+import 'package:iot_manager/features/app_shell/domain/usecases/acknowledge_incident_notification.dart';
+import 'package:iot_manager/features/app_shell/domain/usecases/get_notifications.dart';
+import 'package:iot_manager/features/app_shell/domain/usecases/reject_invitation_notification.dart';
 
 class NotificationsController extends ChangeNotifier {
-  NotificationsController({DevicesRemoteDatasource? remoteDatasource})
-      : remoteDatasource = remoteDatasource ?? DevicesRemoteDatasource();
+  NotificationsController({
+    NotificationsRepository? repository,
+    GetNotifications? getNotifications,
+    AcceptInvitationNotification? acceptInvitationNotification,
+    RejectInvitationNotification? rejectInvitationNotification,
+    AcknowledgeIncidentNotification? acknowledgeIncidentNotification,
+  })  : repository = repository ?? NotificationsRepositoryImpl(),
+        getNotifications = getNotifications ?? GetNotifications(repository ?? NotificationsRepositoryImpl()),
+        acceptInvitationNotification = acceptInvitationNotification ??
+            AcceptInvitationNotification(repository ?? NotificationsRepositoryImpl()),
+        rejectInvitationNotification = rejectInvitationNotification ??
+            RejectInvitationNotification(repository ?? NotificationsRepositoryImpl()),
+        acknowledgeIncidentNotification = acknowledgeIncidentNotification ??
+            AcknowledgeIncidentNotification(repository ?? NotificationsRepositoryImpl());
 
-  final DevicesRemoteDatasource remoteDatasource;
+  final NotificationsRepository repository;
+  final GetNotifications getNotifications;
+  final AcceptInvitationNotification acceptInvitationNotification;
+  final RejectInvitationNotification rejectInvitationNotification;
+  final AcknowledgeIncidentNotification acknowledgeIncidentNotification;
 
   bool loading = false;
   String? errorMessage;
-  List<DeviceInvitationNotification> items = [];
+  List<AppNotification> items = [];
 
-  int get pendingCount => items.where((e) => e.status == 'pending').length;
+  int get pendingCount => items.where((e) => !e.isResolved).length;
   bool get hasError => errorMessage != null && errorMessage!.trim().isNotEmpty;
 
   void clearError() {
@@ -30,8 +54,7 @@ class NotificationsController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final rows = await remoteDatasource.getPendingInvitations();
-      items = rows.map(DeviceInvitationNotification.fromMap).toList();
+      items = await getNotifications();
     } catch (error) {
       setMappedError(error);
       items = [];
@@ -50,9 +73,9 @@ class NotificationsController extends ChangeNotifier {
       throw error;
     }
 
-    final index = items.indexWhere((e) => e.id == normalizedId);
-    DeviceInvitationNotification? backup;
+    final index = items.indexWhere((e) => e is DeviceInvitationNotification && e.id == normalizedId);
 
+    AppNotification? backup;
     if (index != -1) {
       backup = items[index];
       items.removeAt(index);
@@ -61,12 +84,13 @@ class NotificationsController extends ChangeNotifier {
     }
 
     try {
-      await remoteDatasource.acceptInvitation(normalizedId);
+      await acceptInvitationNotification(normalizedId);
       clearError();
       notifyListeners();
     } catch (error) {
-      if (backup != null) {items.insert(index, backup);}
-
+      if (backup != null) {
+        items.insert(index, backup);
+      }
       setMappedError(error);
       notifyListeners();
       throw ErrorMapper.mapException(error);
@@ -76,15 +100,15 @@ class NotificationsController extends ChangeNotifier {
   Future<void> reject(String shareId) async {
     final normalizedId = shareId.trim();
     if (normalizedId.isEmpty) {
-      final error = const ValidationAppException('No se ha encontrado una invitación válida.');
+      final error = const ValidationAppException('No se ha encontrado una invitación válida.',);
       setMappedError(error);
       notifyListeners();
       throw error;
     }
 
-    final index = items.indexWhere((e) => e.id == normalizedId);
-    DeviceInvitationNotification? backup;
+    final index = items.indexWhere((e) => e is DeviceInvitationNotification && e.id == normalizedId);
 
+    AppNotification? backup;
     if (index != -1) {
       backup = items[index];
       items.removeAt(index);
@@ -93,11 +117,46 @@ class NotificationsController extends ChangeNotifier {
     }
 
     try {
-      await remoteDatasource.rejectInvitation(normalizedId);
+      await rejectInvitationNotification(normalizedId);
       clearError();
       notifyListeners();
     } catch (error) {
-      if (backup != null) {items.insert(index, backup);}
+      if (backup != null) {
+        items.insert(index, backup);
+      }
+      setMappedError(error);
+      notifyListeners();
+      throw ErrorMapper.mapException(error);
+    }
+  }
+
+  Future<void> acknowledgeIncident(String incidentId) async {
+    final normalizedId = incidentId.trim();
+    if (normalizedId.isEmpty) {
+      final error = const ValidationAppException('No se ha encontrado una incidencia válida.');
+      setMappedError(error);
+      notifyListeners();
+      throw error;
+    }
+
+    final index = items.indexWhere((e) => e is DeviceIncidentNotification && e.id == normalizedId);
+
+    AppNotification? backup;
+    if (index != -1) {
+      backup = items[index];
+      items.removeAt(index);
+      clearError();
+      notifyListeners();
+    }
+
+    try {
+      await acknowledgeIncidentNotification(normalizedId);
+      clearError();
+      notifyListeners();
+    } catch (error) {
+      if (backup != null) {
+        items.insert(index, backup);
+      }
       setMappedError(error);
       notifyListeners();
       throw ErrorMapper.mapException(error);
@@ -107,42 +166,4 @@ class NotificationsController extends ChangeNotifier {
   Future<void> refresh() async {
     await load();
   }
-}
-
-class DeviceInvitationNotification {
-  const DeviceInvitationNotification({
-    required this.id,
-    required this.deviceId,
-    required this.deviceName,
-    required this.deviceType,
-    required this.ownerId,
-    required this.ownerName,
-    required this.sharedWithEmail,
-    required this.createdAt,
-    required this.status,
-  });
-
-  factory DeviceInvitationNotification.fromMap(Map<String, dynamic> map) {
-    return DeviceInvitationNotification(
-      id: (map['id'] ?? '').toString(),
-      deviceId: (map['device_id'] ?? '').toString(),
-      deviceName: (map['device_name'] ?? 'Dispositivo').toString(),
-      deviceType: (map['device_type'] ?? '').toString(),
-      ownerId: (map['owner_id'] ?? '').toString(),
-      ownerName: (map['owner_name'] ?? '').toString(),
-      sharedWithEmail: (map['shared_with_email'] ?? '').toString(),
-      createdAt: DateTime.tryParse((map['created_at'] ?? '').toString()),
-      status: (map['status'] ?? 'pending').toString(),
-    );
-  }
-
-  final String id;
-  final String deviceId;
-  final String deviceName;
-  final String? deviceType;
-  final String ownerId;
-  final String ownerName;
-  final String sharedWithEmail;
-  final DateTime? createdAt;
-  final String status;
 }
