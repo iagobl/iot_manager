@@ -156,7 +156,7 @@ class DevicePanelController extends ChangeNotifier {
         final activeIncident = await remoteDatasource.getLatestActiveIncident(device.id);
 
         if (activeIncident != null) {
-          final failure = ErrorMapper.mapFailure(Exception(_mapIncidentTypeToErrorKey(activeIncident)));
+          final failure = ErrorMapper.mapFailure(Exception(mapIncidentTypeToErrorKey(activeIncident)));
           _errorMessage = failure.message;
           notifyListeners();
           return;
@@ -275,7 +275,7 @@ class DevicePanelController extends ChangeNotifier {
 
       _autoShutdownIncidentRecorded = true;
       _lastAutoShutdownKey = incidentKey;
-    } catch (_) {}
+    } catch (_) {    }
   }
 
   Map<String, Object> _buildAutomaticShutdownIncident(
@@ -331,7 +331,7 @@ class DevicePanelController extends ChangeNotifier {
     };
   }
 
-  String _mapIncidentTypeToErrorKey(Map<String, dynamic> incident) {
+  String mapIncidentTypeToErrorKey(Map<String, dynamic> incident) {
     final type = (incident['type'] ?? '').toString().toLowerCase().trim();
 
     if (type.contains('overvoltage') || type.contains('voltage')) {
