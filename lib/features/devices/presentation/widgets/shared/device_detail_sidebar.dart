@@ -27,15 +27,20 @@ class DeviceDetailSidebar extends StatelessWidget {
       ),
       child: Column(
         children: [
-          for (final item in _items) ...[
-            SidebarButton(
-              icon: item.icon,
-              isSelected: selectedSection == item.section,
-              tooltip: item.label,
-              onTap: () => onSectionSelected(item.section),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                for (final item in _items)
+                  SidebarButton(
+                    icon: item.icon,
+                    isSelected: selectedSection == item.section,
+                    tooltip: item.label,
+                    onTap: () => onSectionSelected(item.section),
+                  ),
+              ],
             ),
-            const SizedBox(height: 8),
-          ],
+          ),
         ],
       ),
     );
@@ -43,7 +48,8 @@ class DeviceDetailSidebar extends StatelessWidget {
 }
 
 class SidebarButton extends StatelessWidget {
-  const SidebarButton({super.key,
+  const SidebarButton({
+    super.key,
     required this.icon,
     required this.isSelected,
     required this.tooltip,

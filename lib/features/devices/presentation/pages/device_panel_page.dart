@@ -98,30 +98,33 @@ class DevicePanelPageState extends State<DevicePanelPage> {
               ),
             ),
             Expanded(
-              child: Row(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 10, 12),
-                    child: DeviceDetailSidebar(
-                      selectedSection: selectedSection,
-                      onSectionSelected: (section) {
-                        setState(() {
-                          selectedSection = section;
-                        });
-                      },
-                    ),
-                  ),
-                  Expanded(
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 180),
-                      child: Padding(
-                        key: ValueKey(selectedSection),
-                        padding: const EdgeInsets.fromLTRB(0, 0, 12, 12),
-                        child: buildSection(context),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 20),
+                child: Row(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 10, 12),
+                      child: DeviceDetailSidebar(
+                        selectedSection: selectedSection,
+                        onSectionSelected: (section) {
+                          setState(() {
+                            selectedSection = section;
+                          });
+                        },
                       ),
                     ),
-                  ),
-                ],
+                    Expanded(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        child: Padding(
+                          key: ValueKey(selectedSection),
+                          padding: const EdgeInsets.fromLTRB(0, 0, 12, 12),
+                          child: buildSection(context),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
