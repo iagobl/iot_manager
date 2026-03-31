@@ -2,11 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:iot_manager/core/constants/devices_panel_strings.dart';
-
 import 'package:iot_manager/core/error/error_mapper.dart';
-import 'package:iot_manager/core/iot/shelly/shelly_rpc_client.dart';
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
 import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
+import 'package:iot_manager/core/iot/shelly/shelly_rpc_client.dart';
 
 class DevicePanelController extends ChangeNotifier {
   DevicePanelController({
@@ -145,12 +144,12 @@ class DevicePanelController extends ChangeNotifier {
     try {
       final nextValue = !_isOn;
 
-      if (nextValue == true) {
+      if (nextValue) {
         final hasIncidents = await remoteDatasource.hasActiveIncidents(device.id);
 
         if (hasIncidents) {
-          _errorMessage =
-          'El dispositivo está bloqueado por seguridad. Revisa las incidencias activas.';
+          final failure = ErrorMapper.mapFailure(Exception('device_blocked_by_incidents'),);
+          _errorMessage = failure.message;
           notifyListeners();
           return;
         }

@@ -32,6 +32,10 @@ class DeviceFailure extends AppFailure {
   const DeviceFailure(super.message);
 }
 
+class DeviceSafetyFailure extends AppFailure {
+  const DeviceSafetyFailure(super.message);
+}
+
 class DatabaseFailure extends AppFailure {
   const DatabaseFailure(super.message);
 }

@@ -35,6 +35,10 @@ class DeviceAppException extends AppException {
   const DeviceAppException(super.message);
 }
 
+class DeviceSafetyAppException extends DeviceAppException {
+  const DeviceSafetyAppException(super.message);
+}
+
 class DatabaseAppException extends AppException {
   const DatabaseAppException(super.message);
 }
