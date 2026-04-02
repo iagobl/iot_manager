@@ -93,8 +93,29 @@ class DevicesController extends ChangeNotifier {
     clearError();
 
     try {
+      items = await getUserDevices();
+
       final discovery = ShellyLanDiscovery();
-      discoveredDevices = await discovery.discoverAll(maxResults: 50);
+      final foundDevices = await discovery.discoverAll(maxResults: 50);
+
+      final existingIdentifiers = items
+          .map((device) => device.identifier.trim().toLowerCase())
+          .where((identifier) => identifier.isNotEmpty).toSet();
+
+      final uniqueByIp = <String, DiscoveredIotDevice>{};
+
+      for (final device in foundDevices) {
+        final normalizedIp = device.ip.trim().toLowerCase();
+        if (normalizedIp.isEmpty) continue;
+
+        if (existingIdentifiers.contains(normalizedIp)) {
+          continue;
+        }
+
+        uniqueByIp[normalizedIp] = device;
+      }
+
+      discoveredDevices = uniqueByIp.values.toList()..sort((a, b) => a.ip.compareTo(b.ip));
 
       if (discoveredDevices.isEmpty) {
         setError(DevicesStrings.notShellyinLAN);
