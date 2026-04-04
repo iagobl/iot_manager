@@ -5,6 +5,15 @@ class IoTStrings {
   static const blockPermissions = 'Permisos BLE bloqueados. Ve a Ajustes > Apps > tu app > Permisos y habilita Bluetooth y Ubicación.';
   static const permissionsError = 'Permisos BLE no concedidos. Se requieren Bluetooth y Ubicación para descubrir dispositivos';
 
+  static const blockApPermissions = 'Los permisos de Wi-Fi o ubicación están bloqueados. Ve a Ajustes y habilítalos para buscar y conectar redes Shelly.';
+  static const permissionsApError = 'La app necesita permisos de Wi-Fi y ubicación para trabajar con el modo AP.';
+  static const errorScanningShellyApNetworks = 'No se pudieron escanear las redes Wi-Fi Shelly cercanas.';
+  static const errorGettingCurrentWifi = 'No se pudo obtener la red Wi-Fi actual del móvil.';
+  static const notConnectedToShellyApAutomatically = 'No se pudo conectar automáticamente a la red del Shelly.';
+  static const timeoutConnectingShellyAp = 'Se agotó el tiempo al intentar conectarse a la red del Shelly.';
+  static const notConnectedToExpectedShellyAp = 'El móvil no está conectado a la red del Shelly seleccionado.';
+  static const errorSendingWifiCredentialsByAp = 'No se pudieron enviar las credenciales Wi-Fi al Shelly usando el modo AP.';
+
   static const notConnectingBLE = 'BLE no conectado';
 
   static const notConnectingWiFi = 'No se pudo obtener la subred local. Comprueba que estás conectado a una Wi-Fi';

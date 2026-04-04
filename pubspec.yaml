@@ -42,6 +42,7 @@ dependencies:
   network_info_plus: ^5.0.3
   flutter_blue_plus: ^1.31.15
   permission_handler: ^11.3.1
+  wifi_iot: ^0.3.19+2
 
   pdf: ^3.11.0
   printing: ^5.13.4

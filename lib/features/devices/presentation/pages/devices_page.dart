@@ -6,6 +6,7 @@ import 'package:iot_manager/core/iot/models/discovered_iot_device.dart';
 
 import 'package:iot_manager/features/devices/presentation/controllers/devices_controller.dart';
 import 'package:iot_manager/features/devices/presentation/pages/device_panel_page.dart';
+import 'package:iot_manager/features/devices/presentation/pages/shelly_ap_provision_page.dart';
 import 'package:iot_manager/features/devices/presentation/pages/shelly_ble_provision_page.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/device_card.dart';
 
@@ -69,12 +70,12 @@ class DevicesPageState extends State<DevicesPage> {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.add_circle_outline_rounded),
-                  title: const Text(DevicesStrings.configurationManual),
-                  subtitle: const Text(DevicesStrings.configurationManualSubtitle,),
+                  leading: const Icon(Icons.router_rounded),
+                  title: const Text(DevicesStrings.configurationAp),
+                  subtitle: const Text(DevicesStrings.configurationApSubtitle),
                   onTap: () async {
                     Navigator.of(bottomSheetContext).pop();
-                    await _showManualAddDialog();
+                    await openApProvisionFlow();
                   },
                 ),
               ],
@@ -104,7 +105,29 @@ class DevicesPageState extends State<DevicesPage> {
       identifier: result.ip,
     );
 
-    showControllerMessageIfNeeded(successMessage: DevicesStrings.addDeviceSucesful,);
+    showControllerMessageIfNeeded(
+      successMessage: DevicesStrings.addDeviceSucesful,
+    );
+  }
+
+  Future<void> openApProvisionFlow() async {
+    final result = await Navigator.of(context).push<ShellyApProvisionPageResult>(
+      MaterialPageRoute(builder: (_) => const ShellyApProvisionPage()),
+    );
+
+    if (!mounted || result == null) return;
+
+    final model = (result.deviceInfo['model'] ?? '').toString().trim();
+    final suggestedName = model.isNotEmpty ? model : 'Shelly';
+    final type = inferTypeFromModel(model);
+
+    await controller.addManualDevice(
+      name: suggestedName,
+      deviceType: type,
+      identifier: result.ip,
+    );
+
+    showControllerMessageIfNeeded(successMessage: DevicesStrings.addDeviceSucesful);
   }
 
   String inferTypeFromModel(String model) {
@@ -116,127 +139,6 @@ class DevicesPageState extends State<DevicesPage> {
       return 'light';
     }
     return 'plug';
-  }
-
-  Future<void> _showManualAddDialog() async {
-    final nameController = TextEditingController();
-    final identifierController = TextEditingController();
-    String selectedType = 'plug';
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        bool saving = false;
-
-        return StatefulBuilder(
-          builder: (context, setLocalState) {
-            Future<void> save() async {
-              final name = nameController.text.trim();
-              final identifier = identifierController.text.trim();
-
-              if (name.isEmpty || identifier.isEmpty) {
-                ScaffoldMessenger.of(dialogContext).showSnackBar(
-                  const SnackBar(content: Text(DevicesStrings.completeConfiguration))
-                );
-                return;
-              }
-
-              final navigator = Navigator.of(dialogContext);
-              final messenger = ScaffoldMessenger.of(this.context);
-
-              setLocalState(() => saving = true);
-
-              await controller.addManualDevice(
-                name: name,
-                deviceType: selectedType,
-                identifier: identifier,
-              );
-
-              if (!mounted) return;
-
-              setLocalState(() => saving = false);
-
-              if (controller.errorMessage == null) {
-                navigator.pop();
-                messenger.showSnackBar(
-                  const SnackBar(content: Text(DevicesStrings.addDeviceSucesful))
-                );
-              } else {
-                messenger.showSnackBar(SnackBar(content: Text(controller.errorMessage!)));
-              }
-            }
-
-            return AlertDialog(
-              title: const Text(DevicesStrings.addDevice),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(
-                        labelText: AppStrings.name,
-                        hintText: DevicesStrings.ejTipesDevices,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedType,
-                      decoration: const InputDecoration(
-                        labelText: DevicesStrings.tipesDevices,
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'plug',
-                          child: Text(DevicesStrings.plug),
-                        ),
-                        DropdownMenuItem(
-                          value: 'light',
-                          child: Text(DevicesStrings.light),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setLocalState(() => selectedType = value);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: identifierController,
-                      decoration: const InputDecoration(
-                        labelText: AppStrings.ipHost,
-                        hintText: DevicesStrings.ejIP,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: saving
-                      ? null
-                      : () => Navigator.of(dialogContext).pop(),
-                  child: const Text(AppStrings.cancel),
-                ),
-                FilledButton(
-                  onPressed: saving ? null : save,
-                  child: saving
-                      ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                      : const Text(AppStrings.save),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    nameController.dispose();
-    identifierController.dispose();
   }
 
   Future<void> scanNetwork() async {
