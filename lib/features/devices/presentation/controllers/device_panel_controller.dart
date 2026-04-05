@@ -52,6 +52,8 @@ class DevicePanelController extends ChangeNotifier {
   int _uptimeSeconds = 0;
 
   Timer? pollTimer;
+  DateTime? _lastReadingSampleAt;
+  double? _lastDeviceEnergyTotalWh;
 
   bool get loading => _loading;
   bool get busyPowerAction => _busyPowerAction;
@@ -131,6 +133,8 @@ class DevicePanelController extends ChangeNotifier {
       if (_energyTodayWh <= 0) {
         _energyTodayWh = device.energyTodayWh;
       }
+
+      await persistReadingSample(switchStatus: switchStatus, force: true);
 
       _errorMessage = null;
       notifyListeners();
@@ -261,7 +265,9 @@ class DevicePanelController extends ChangeNotifier {
 
   void startPolling() {
     pollTimer?.cancel();
-    pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(refreshSilently()));
+    pollTimer = Timer.periodic(
+      const Duration(seconds: 5), (_) => unawaited(refreshSilently()),
+    );
   }
 
   Future<void> refreshSilently() async {
@@ -278,6 +284,8 @@ class DevicePanelController extends ChangeNotifier {
       applyWifiStatus(wifiStatus);
       applySystemStatus(systemStatus);
 
+      await persistReadingSample(switchStatus: switchStatus);
+
       if (_errorMessage != null) {
         _errorMessage = null;
       }
@@ -289,6 +297,54 @@ class DevicePanelController extends ChangeNotifier {
         _errorMessage = failure.message;
         notifyListeners();
       }
+    }
+  }
+
+  Future<void> persistReadingSample({
+    required Map<String, dynamic> switchStatus,
+    bool force = false,
+  }) async {
+    final now = DateTime.now().toUtc();
+
+    if (!force && _lastReadingSampleAt != null) {
+      final elapsed = now.difference(_lastReadingSampleAt!);
+      if (elapsed.inSeconds < 10) return;
+    }
+
+    try {
+      final deviceEnergyTotalWh = readDouble(
+        switchStatus,
+        const ['aenergy.total', 'energy.total'],
+      );
+
+      double energySampleWh = 0;
+      if (_lastReadingSampleAt != null) {
+        final elapsedSeconds = now.difference(_lastReadingSampleAt!).inSeconds;
+
+        if (elapsedSeconds > 0) {
+          if (deviceEnergyTotalWh > 0 &&
+              _lastDeviceEnergyTotalWh != null &&
+              deviceEnergyTotalWh >= _lastDeviceEnergyTotalWh!) {
+            energySampleWh = deviceEnergyTotalWh - _lastDeviceEnergyTotalWh!;
+          } else {
+            energySampleWh = _powerW * (elapsedSeconds / 3600.0);
+          }
+        }
+      }
+
+      await remoteDatasource.insertReadingSample(
+        deviceId: device.id,
+        timestamp: now,
+        powerW: _powerW,
+        voltageV: _voltageV,
+        energyWh: energySampleWh < 0 ? 0 : energySampleWh,
+      );
+
+      _lastReadingSampleAt = now;
+      if (deviceEnergyTotalWh > 0) {
+        _lastDeviceEnergyTotalWh = deviceEnergyTotalWh;
+      }
+    } catch (_) {
     }
   }
 

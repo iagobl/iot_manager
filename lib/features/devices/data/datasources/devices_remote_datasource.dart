@@ -972,6 +972,32 @@ class DevicesRemoteDatasource {
     }
   }
 
+  Future<void> insertReadingSample({
+    required String deviceId,
+    required DateTime timestamp,
+    required double powerW,
+    required double voltageV,
+    required double energyWh,
+  }) async {
+    try {
+      final normalizedDeviceId = deviceId.trim();
+
+      if (normalizedDeviceId.isEmpty) {
+        throw const ValidationAppException('No se ha encontrado un identificador válido del dispositivo.');
+      }
+
+      await _client.from('readings').insert({
+        'device_id': normalizedDeviceId,
+        'ts': timestamp.toUtc().toIso8601String(),
+        'power_w': powerW,
+        'voltage_v': voltageV,
+        'energy_wh': energyWh,
+      });
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
+    }
+  }
+
   String _requireUserId() {
     final userId = _client.auth.currentUser?.id;
     if (userId == null || userId.isEmpty) {

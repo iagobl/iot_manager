@@ -118,11 +118,14 @@ class DeviceChartsSectionState extends State<DeviceChartsSection>
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          ChartsHeader(
+          ChartsHeroHeader(
+            deviceName: widget.deviceName,
+            metric: controller.metric,
+            range: controller.range,
             exportingPdf: controller.exportingPdf,
             onExportPdf: onExportPdf,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           SelectorCard(
             metric: controller.metric,
             range: controller.range,
@@ -147,15 +150,19 @@ class DeviceChartsSectionState extends State<DeviceChartsSection>
                 title: data.title,
                 subtitle: data.subtitle,
                 unit: data.unit,
-                pointsCount: data.points.length,
                 total: data.total,
                 average: data.average,
                 min: data.min,
                 max: data.max,
+                latestValue: data.latestValue,
                 isConsumption: controller.metric == ChartMetric.consumption,
               ),
               const SizedBox(height: 12),
-              LineChartCard(data: data),
+              LineChartCard(
+                data: data,
+                metric: controller.metric,
+                range: controller.range,
+              ),
               if (controller.errorMessage != null) ...[
                 const SizedBox(height: 12),
                 InlineInfoCard(message: controller.errorMessage!),
@@ -167,12 +174,19 @@ class DeviceChartsSectionState extends State<DeviceChartsSection>
   }
 }
 
-class ChartsHeader extends StatelessWidget {
-  const ChartsHeader({super.key,
+class ChartsHeroHeader extends StatelessWidget {
+  const ChartsHeroHeader({
+    super.key,
+    required this.deviceName,
+    required this.metric,
+    required this.range,
     required this.exportingPdf,
     required this.onExportPdf,
   });
 
+  final String deviceName;
+  final ChartMetric metric;
+  final ChartRange range;
   final bool exportingPdf;
   final Future<void> Function() onExportPdf;
 
@@ -180,50 +194,156 @@ class ChartsHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            scheme.primary.withValues(alpha: 0.12),
+            scheme.primary.withValues(alpha: 0.04),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.14)),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Gráficas e informes',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  Icons.show_chart_rounded,
+                  color: scheme.primary,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text('Consulta el historial del dispositivo y exporta un informe en PDF.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Monitor de gráficas',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(deviceName,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: exportingPdf ? null : onExportPdf,
+                icon: exportingPdf ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(scheme.onPrimary),
+                  ),
+                ) : const Icon(Icons.picture_as_pdf_outlined),
+                label: Text(exportingPdf ? 'Generando...' : 'PDF'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
                 ),
               ),
             ],
           ),
-        ),
-        const SizedBox(width: 12),
-        FilledButton.icon(
-          onPressed: exportingPdf ? null : onExportPdf,
-          icon: exportingPdf ? SizedBox(width: 16, height: 16,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                scheme.onPrimary,
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              HeaderChip(
+                icon: metricIcon(metric),
+                label: chartMetricLabel(metric),
               ),
-            ),
-          ) : const Icon(Icons.picture_as_pdf_outlined),
-          label: Text(exportingPdf ? 'Generando...' : 'PDF'),
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              HeaderChip(
+                icon: Icons.schedule_rounded,
+                label: chartRangeLabel(range),
+              ),
+              const HeaderChip(
+                icon: Icons.sync_rounded,
+                label: 'Actualización automática',
+              ),
+            ],
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+}
+
+class HeaderChip extends StatelessWidget {
+  const HeaderChip({
+    super.key,
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: scheme.surface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.10)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: scheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: scheme.onSurface,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class SelectorCard extends StatelessWidget {
-  const SelectorCard({super.key,
+  const SelectorCard({
+    super.key,
     required this.metric,
     required this.range,
     required this.onMetricChanged,
@@ -240,11 +360,18 @@ class SelectorCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: scheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: IntrinsicHeight(
         child: Row(
@@ -273,12 +400,12 @@ class SelectorCard extends StatelessWidget {
                 onChanged: onMetricChanged,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Container(
               width: 1,
               color: scheme.outline.withValues(alpha: 0.10),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: SelectorColumn<ChartRange>(
                 title: 'Período',
@@ -299,7 +426,8 @@ class SelectorCard extends StatelessWidget {
 }
 
 class SelectorColumn<T> extends StatelessWidget {
-  const SelectorColumn({super.key,
+  const SelectorColumn({
+    super.key,
     required this.title,
     required this.value,
     required this.items,
@@ -349,7 +477,8 @@ class PillItem<T> {
 }
 
 class PillButton<T> extends StatelessWidget {
-  const PillButton({super.key,
+  const PillButton({
+    super.key,
     required this.item,
     required this.selected,
     required this.onTap,
@@ -370,15 +499,15 @@ class PillButton<T> extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
         width: double.infinity,
-        constraints: const BoxConstraints(minHeight: 42),
+        constraints: const BoxConstraints(minHeight: 46),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
-          color: selected ? scheme.primary.withValues(alpha: 0.14)
-              : scheme.surfaceContainerHighest.withValues(alpha: 0.42),
+          color: selected ? scheme.primary.withValues(alpha: 0.12)
+              : scheme.surfaceContainerHighest.withValues(alpha: 0.38),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: selected ? scheme.primary.withValues(alpha: 0.25)
-                : scheme.outline.withValues(alpha: 0.14),
+            color: selected ? scheme.primary.withValues(alpha: 0.24)
+                : scheme.outline.withValues(alpha: 0.12),
           ),
         ),
         child: Row(
@@ -386,10 +515,10 @@ class PillButton<T> extends StatelessWidget {
             if (item.icon != null) ...[
               Icon(
                 item.icon,
-                size: 15,
+                size: 16,
                 color: selected ? scheme.primary : scheme.onSurfaceVariant,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
             ],
             Expanded(
               child: Text(
@@ -397,7 +526,7 @@ class PillButton<T> extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w700,
                   color: selected ? scheme.primary : scheme.onSurface,
                 ),
@@ -411,26 +540,27 @@ class PillButton<T> extends StatelessWidget {
 }
 
 class ChartSummaryCard extends StatelessWidget {
-  const ChartSummaryCard({super.key,
+  const ChartSummaryCard({
+    super.key,
     required this.title,
     required this.subtitle,
     required this.unit,
-    required this.pointsCount,
     required this.total,
     required this.average,
     required this.min,
     required this.max,
+    required this.latestValue,
     required this.isConsumption,
   });
 
   final String title;
   final String subtitle;
   final String unit;
-  final int pointsCount;
   final double? total;
   final double? average;
   final double? min;
   final double? max;
+  final double? latestValue;
   final bool isConsumption;
 
   @override
@@ -438,57 +568,88 @@ class ChartSummaryCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: scheme.outline.withValues(alpha: 0.10),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(subtitle,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              LiveValueBadge(
+                label: 'Último valor',
+                value: formatChartValue(
+                  isConsumption ? total : latestValue,
+                  unit,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(subtitle,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final itemWidth = (constraints.maxWidth - 10) / 2;
-
-              return Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  StatCard(
-                    width: itemWidth,
-                    label: isConsumption ? 'Total' : 'Media',
-                    value: formatChartValue(
-                      isConsumption ? total : average,
-                      unit,
-                    ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: StatCard(
+                  label: isConsumption ? 'Total' : 'Media',
+                  value: formatChartValue(
+                    isConsumption ? total : average,
+                    unit,
                   ),
-                  StatCard(
-                    width: itemWidth,
-                    label: 'Mínimo',
-                    value: formatChartValue(min, unit),
-                  ),
-                  StatCard(
-                    width: itemWidth,
-                    label: 'Máximo',
-                    value: formatChartValue(max, unit),
-                  ),
-                  StatCard(
-                    width: itemWidth,
-                    label: 'Muestras',
-                    value: '$pointsCount',
-                  ),
-                ],
-              );
-            },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: StatCard(
+                  label: 'Mínimo',
+                  value: formatChartValue(min, unit),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: StatCard(
+                  label: 'Máximo',
+                  value: formatChartValue(max, unit),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -496,14 +657,13 @@ class ChartSummaryCard extends StatelessWidget {
   }
 }
 
-class StatCard extends StatelessWidget {
-  const StatCard({super.key,
-    required this.width,
+class LiveValueBadge extends StatelessWidget {
+  const LiveValueBadge({
+    super.key,
     required this.label,
     required this.value,
   });
 
-  final double width;
   final String label;
   final String value;
 
@@ -512,23 +672,106 @@ class StatCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Container(
-      width: width,
-      padding: const EdgeInsets.all(12),
+      constraints: const BoxConstraints(minWidth: 120),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            scheme.primary.withValues(alpha: 0.08),
+            scheme.primary.withValues(alpha: 0.16),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: scheme.primary.withValues(alpha: 0.18),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: scheme.primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
-          Text(value,
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: scheme.primary,
+              height: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class StatCard extends StatelessWidget {
+  const StatCard({
+    super.key,
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.40),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, height: 1.1),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: scheme.onSurface,
+              height: 1,
+            ),
           ),
         ],
       ),
@@ -537,39 +780,78 @@ class StatCard extends StatelessWidget {
 }
 
 class LineChartCard extends StatelessWidget {
-  const LineChartCard({super.key,
+  const LineChartCard({
+    super.key,
     required this.data,
+    required this.metric,
+    required this.range,
   });
 
   final PreparedChartData data;
+  final ChartMetric metric;
+  final ChartRange range;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: scheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.shadow.withValues(alpha: 0.03),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: SizedBox(
-        height: 340,
+        height: 390,
         child: data.points.isNotEmpty ? Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(data.title,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+            Wrap(
+              spacing: 12,
+              runSpacing: 10,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 140),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(data.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                          height: 1.15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(data.subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                MonitorStatusPill(label: monitorCaption(metric, range)),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(data.subtitle,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Expanded(
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(22),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: scheme.surfaceContainerLowest,
@@ -579,6 +861,7 @@ class LineChartCard extends StatelessWidget {
                       data: data,
                       drawHeader: false,
                       pdfMode: false,
+                      showXAxisLabels: false,
                     ),
                     child: const SizedBox.expand(),
                   ),
@@ -586,11 +869,15 @@ class LineChartCard extends StatelessWidget {
               ),
             ),
           ],
-        ) : Column(
+        )
+            : Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(data.title,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+              ),
             ),
             const SizedBox(height: 4),
             Text(data.subtitle,
@@ -613,6 +900,51 @@ class LineChartCard extends StatelessWidget {
   }
 }
 
+class MonitorStatusPill extends StatelessWidget {
+  const MonitorStatusPill({
+    super.key,
+    required this.label,
+  });
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: scheme.primary,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: scheme.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class ChartsLoadingState extends StatelessWidget {
   const ChartsLoadingState({super.key});
 
@@ -621,10 +953,10 @@ class ChartsLoadingState extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Container(
-      height: 260,
+      height: 280,
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: const Center(child: CircularProgressIndicator()),
@@ -633,7 +965,8 @@ class ChartsLoadingState extends StatelessWidget {
 }
 
 class ChartsErrorState extends StatelessWidget {
-  const ChartsErrorState({super.key,
+  const ChartsErrorState({
+    super.key,
     required this.error,
     required this.onRetry,
   });
@@ -646,16 +979,16 @@ class ChartsErrorState extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: scheme.surface,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         children: [
           const SizedBox(height: 10),
-          Icon(Icons.show_chart_rounded, size: 34, color: scheme.onSurfaceVariant),
+          Icon(Icons.show_chart_rounded, size: 36, color: scheme.onSurfaceVariant),
           const SizedBox(height: 12),
           const Text('No se pudieron cargar las gráficas',
             textAlign: TextAlign.center,
@@ -679,7 +1012,8 @@ class ChartsErrorState extends StatelessWidget {
 }
 
 class InlineInfoCard extends StatelessWidget {
-  const InlineInfoCard({super.key,
+  const InlineInfoCard({
+    super.key,
     required this.message,
   });
 
@@ -698,5 +1032,28 @@ class InlineInfoCard extends StatelessWidget {
       ),
       child: Text(message, style: TextStyle(color: scheme.onErrorContainer)),
     );
+  }
+}
+
+IconData metricIcon(ChartMetric metric) {
+  switch (metric) {
+    case ChartMetric.consumption:
+      return Icons.bolt_outlined;
+    case ChartMetric.power:
+      return Icons.flash_on_outlined;
+    case ChartMetric.voltage:
+      return Icons.electrical_services_outlined;
+  }
+}
+
+String monitorCaption(ChartMetric metric, ChartRange range) {
+  final metricLabel = chartMetricLabel(metric);
+  switch (range) {
+    case ChartRange.today:
+      return '$metricLabel en seguimiento';
+    case ChartRange.week:
+      return '$metricLabel semanal';
+    case ChartRange.month:
+      return '$metricLabel mensual';
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -19,6 +20,8 @@ class DeviceChartsController extends ChangeNotifier {
     required this.deviceId,
     required this.remoteDatasource,
   });
+
+  static const Duration liveWindowDuration = Duration(minutes: 20);
 
   final String deviceId;
   final DevicesRemoteDatasource remoteDatasource;
@@ -44,7 +47,7 @@ class DeviceChartsController extends ChangeNotifier {
 
     switch (range) {
       case ChartRange.today:
-        return DateTime(n.year, n.month, n.day);
+        return n.subtract(liveWindowDuration);
       case ChartRange.week:
         return n.subtract(const Duration(days: 7));
       case ChartRange.month:
@@ -135,7 +138,7 @@ class DeviceChartsController extends ChangeNotifier {
   void startSilentRefresh() {
     refreshTimer?.cancel();
     refreshTimer = Timer.periodic(
-      const Duration(seconds: 20), (_) => unawaited(load()),
+      const Duration(seconds: 10), (_) => unawaited(load()),
     );
   }
 
@@ -236,9 +239,9 @@ class DeviceChartsController extends ChangeNotifier {
               runSpacing: 10,
               children: [
                 pdfStatBox(
-                  label: metric == ChartMetric.consumption ? 'Total' : 'Media',
+                  label: range == ChartRange.today ? 'Último valor' : 'Media',
                   value: formatChartValue(
-                    metric == ChartMetric.consumption ? data.total : data.average,
+                    range == ChartRange.today ? data.latestValue : data.average,
                     data.unit,
                   ),
                   borderColor: borderColor,
@@ -253,35 +256,26 @@ class DeviceChartsController extends ChangeNotifier {
                   value: formatChartValue(data.max, data.unit),
                   borderColor: borderColor,
                 ),
-                pdfStatBox(
-                  label: 'Muestras',
-                  value: '${data.points.length}',
-                  borderColor: borderColor,
-                ),
               ],
             ),
-            pw.SizedBox(height: 18),
+            pw.SizedBox(height: 16),
             pdfSectionTitle('Gráfica', mainColor),
             pw.SizedBox(height: 8),
             pw.Container(
-              width: double.infinity,
-              padding: const pw.EdgeInsets.all(14),
+              padding: const pw.EdgeInsets.all(12),
               decoration: pw.BoxDecoration(
                 border: pw.Border.all(color: borderColor),
-                borderRadius: pw.BorderRadius.circular(14),
+                borderRadius: pw.BorderRadius.circular(12),
               ),
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Text(data.title,
-                    style: pw.TextStyle(
-                      fontSize: 13,
-                      fontWeight: pw.FontWeight.bold,
+                  pw.Text(
+                    '${data.title} · ${data.subtitle}',
+                    style: const pw.TextStyle(
+                      fontSize: 10.5,
+                      color: PdfColors.grey700,
                     ),
-                  ),
-                  pw.SizedBox(height: 3),
-                  pw.Text(data.subtitle,
-                    style: const pw.TextStyle(fontSize: 10.5),
                   ),
                   pw.SizedBox(height: 12),
                   pw.SizedBox(
@@ -366,6 +360,7 @@ class DeviceChartsController extends ChangeNotifier {
         data: chartData,
         drawHeader: false,
         pdfMode: true,
+        showXAxisLabels: true,
       );
 
       painter.paint(canvas, size);
@@ -507,21 +502,23 @@ class PreparedChartData {
     required this.axisStart,
     required this.axisEnd,
     required this.range,
+    required this.latestValue,
+    required this.latestLabel,
   });
 
   final String title;
   final String subtitle;
   final String unit;
   final List<ChartPoint> points;
-
   final double? total;
   final double? average;
   final double? min;
   final double? max;
-
   final DateTime axisStart;
   final DateTime axisEnd;
   final ChartRange range;
+  final double? latestValue;
+  final String? latestLabel;
 }
 
 class ChartPoint {
@@ -563,10 +560,9 @@ PreparedChartData buildChartData({
         unit: 'V',
       );
     case ChartMetric.consumption:
-      return _buildConsumptionData(
+      return buildConsumptionData(
         rows: rows,
         range: range,
-        from: from,
         now: now,
       );
   }
@@ -580,6 +576,7 @@ PreparedChartData buildMetricData({
   required String title,
   required String unit,
 }) {
+  final axis = axisBounds(range, now);
   final rawValues = <double>[];
 
   if (range == ChartRange.today) {
@@ -590,12 +587,11 @@ PreparedChartData buildMetricData({
       final value = extractor(row);
 
       if (ts == null || value == null) continue;
+      if (ts.isBefore(axis.$1) || ts.isAfter(axis.$2)) continue;
 
       rawValues.add(value);
       points.add(ChartPoint(x: ts, value: value, label: xLabelForRange(ts, range)));
     }
-
-    final axis = axisBounds(range, now);
 
     return PreparedChartData(
       title: title,
@@ -609,6 +605,8 @@ PreparedChartData buildMetricData({
       axisStart: axis.$1,
       axisEnd: axis.$2,
       range: range,
+      latestValue: points.isEmpty ? null : points.last.value,
+      latestLabel: points.isEmpty ? null : points.last.label,
     );
   }
 
@@ -619,6 +617,7 @@ PreparedChartData buildMetricData({
     final value = extractor(row);
 
     if (ts == null || value == null) continue;
+    if (ts.isBefore(axis.$1) || ts.isAfter(axis.$2)) continue;
 
     rawValues.add(value);
 
@@ -639,8 +638,6 @@ PreparedChartData buildMetricData({
     );
   }).toList();
 
-  final axis = axisBounds(range, now);
-
   return PreparedChartData(
     title: title,
     subtitle: subtitleForRange(range),
@@ -653,64 +650,81 @@ PreparedChartData buildMetricData({
     axisStart: axis.$1,
     axisEnd: axis.$2,
     range: range,
+    latestValue: points.isEmpty ? null : points.last.value,
+    latestLabel: points.isEmpty ? null : points.last.label,
   );
 }
 
-PreparedChartData _buildConsumptionData({
+PreparedChartData buildConsumptionData({
   required List<Map<String, dynamic>> rows,
   required ChartRange range,
-  required DateTime from,
   required DateTime now,
 }) {
-  final Map<DateTime, double> buckets = {};
+  final axis = axisBounds(range, now);
   final rawValues = <double>[];
 
-  final ordered = [...rows]
-    ..sort((a, b) {
-      final aTs = (a['ts'] ?? '').toString();
-      final bTs = (b['ts'] ?? '').toString();
-      return aTs.compareTo(bTs);
-    });
+  if (range == ChartRange.today) {
+    final points = <ChartPoint>[];
 
-  for (int i = 0; i < ordered.length; i++) {
-    final current = ordered[i];
-    final ts = DateTime.tryParse((current['ts'] ?? '').toString())?.toLocal();
-    if (ts == null) continue;
+    for (final row in rows) {
+      final ts = DateTime.tryParse((row['ts'] ?? '').toString())?.toLocal();
+      final value = toDouble(row['energy_wh']);
 
-    double? energyWh = toDouble(current['energy_wh']);
+      if (ts == null || value == null) continue;
+      if (ts.isBefore(axis.$1) || ts.isAfter(axis.$2)) continue;
 
-    if (energyWh == null && i < ordered.length - 1) {
-      final nextTs =
-      DateTime.tryParse((ordered[i + 1]['ts'] ?? '').toString())?.toLocal();
-      final powerW = toDouble(current['power_w']);
-
-      if (nextTs != null && powerW != null) {
-        final seconds = nextTs.difference(ts).inSeconds;
-        if (seconds > 0) {
-          energyWh = powerW * (seconds / 3600.0);
-        }
-      }
+      rawValues.add(value);
+      points.add(
+        ChartPoint(
+          x: ts,
+          value: value,
+          label: xLabelForRange(ts, range),
+        ),
+      );
     }
 
-    if (energyWh == null || energyWh < 0) continue;
+    return PreparedChartData(
+      title: 'Consumo (Wh)',
+      subtitle: subtitleForRange(range),
+      unit: 'Wh',
+      points: points,
+      total: rawValues.isEmpty ? null : rawValues.reduce((a, b) => a + b),
+      average: rawValues.isEmpty
+          ? null
+          : rawValues.reduce((a, b) => a + b) / rawValues.length,
+      min: rawValues.isEmpty ? null : rawValues.reduce(math.min),
+      max: rawValues.isEmpty ? null : rawValues.reduce(math.max),
+      axisStart: axis.$1,
+      axisEnd: axis.$2,
+      range: range,
+      latestValue: points.isEmpty ? null : points.last.value,
+      latestLabel: points.isEmpty ? null : points.last.label,
+    );
+  }
 
-    rawValues.add(energyWh);
+  final Map<DateTime, double> buckets = {};
+
+  for (final row in rows) {
+    final ts = DateTime.tryParse((row['ts'] ?? '').toString())?.toLocal();
+    final value = toDouble(row['energy_wh']);
+
+    if (ts == null || value == null) continue;
+    if (ts.isBefore(axis.$1) || ts.isAfter(axis.$2)) continue;
+
+    rawValues.add(value);
 
     final bucket = bucketDate(ts, range);
-    buckets[bucket] = (buckets[bucket] ?? 0) + energyWh;
+    buckets[bucket] = (buckets[bucket] ?? 0) + value;
   }
 
   final sortedKeys = buckets.keys.toList()..sort();
 
-  final points = sortedKeys.map((key) {
-    return ChartPoint(
+  final points = sortedKeys.map((key) => ChartPoint(
       x: key,
-      value: buckets[key] ?? 0,
+      value: buckets[key]!,
       label: xLabelForRange(key, range),
-    );
-  }).toList();
-
-  final axis = axisBounds(range, now);
+    ),
+  ).toList();
 
   return PreparedChartData(
     title: 'Consumo (Wh)',
@@ -724,28 +738,26 @@ PreparedChartData _buildConsumptionData({
     axisStart: axis.$1,
     axisEnd: axis.$2,
     range: range,
+    latestValue: points.isEmpty ? null : points.last.value,
+    latestLabel: points.isEmpty ? null : points.last.label,
   );
 }
 
-(DateTime, DateTime) axisBounds(ChartRange range, DateTime now) {
+(DateTime, DateTime) axisBounds(ChartRange range, DateTime end) {
   switch (range) {
     case ChartRange.today:
-      final start = DateTime(now.year, now.month, now.day);
-      final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
-      return (start, end);
+      return (end.subtract(DeviceChartsController.liveWindowDuration), end);
     case ChartRange.week:
-      final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
-      return (now.subtract(const Duration(days: 6)), end);
+      return (end.subtract(const Duration(days: 6)), end);
     case ChartRange.month:
-      final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
-      return (now.subtract(const Duration(days: 29)), end);
+      return (end.subtract(const Duration(days: 29)), end);
   }
 }
 
 DateTime bucketDate(DateTime ts, ChartRange range) {
   switch (range) {
     case ChartRange.today:
-      return DateTime(ts.year, ts.month, ts.day, ts.hour);
+      return DateTime(ts.year, ts.month, ts.day, ts.hour, ts.minute);
     case ChartRange.week:
     case ChartRange.month:
       return DateTime(ts.year, ts.month, ts.day);
@@ -755,7 +767,7 @@ DateTime bucketDate(DateTime ts, ChartRange range) {
 String subtitleForRange(ChartRange range) {
   switch (range) {
     case ChartRange.today:
-      return 'Agrupado por horas';
+      return 'Seguimiento en tiempo real';
     case ChartRange.week:
       return 'Agrupado por días (últimos 7 días)';
     case ChartRange.month:
@@ -766,7 +778,7 @@ String subtitleForRange(ChartRange range) {
 String xLabelForRange(DateTime date, ChartRange range) {
   switch (range) {
     case ChartRange.today:
-      return '${two(date.hour)}:00';
+      return '${two(date.hour)}:${two(date.minute)}';
     case ChartRange.week:
     case ChartRange.month:
       return '${two(date.day)}/${two(date.month)}';
@@ -776,7 +788,7 @@ String xLabelForRange(DateTime date, ChartRange range) {
 double? toDouble(dynamic value) {
   if (value == null) return null;
   if (value is num) return value.toDouble();
-  return double.tryParse(value.toString());
+  return double.tryParse(value.toString().replaceAll(',', '.'));
 }
 
 String formatChartValue(double? value, String unit) {
@@ -821,7 +833,7 @@ String sanitize(String value) {
       .trim()
       .toLowerCase()
       .replaceAll(RegExp(r'\s+'), '_')
-      .replaceAll(RegExp(r'[^a-z0-9_\\-]'), '');
+      .replaceAll(RegExp(r'[^a-z0-9_\-]'), '');
 }
 
 String two(int value) => value.toString().padLeft(2, '0');
@@ -831,18 +843,20 @@ class AdvancedLinePainter extends CustomPainter {
     required this.data,
     this.drawHeader = true,
     this.pdfMode = false,
+    this.showXAxisLabels = true,
   });
 
   final PreparedChartData data;
   final bool drawHeader;
   final bool pdfMode;
+  final bool showXAxisLabels;
 
   @override
   void paint(Canvas canvas, Size size) {
     final leftPad = pdfMode ? 78.0 : 52.0;
-    final rightPad = pdfMode ? 24.0 : 16.0;
-    final topPad = drawHeader ? (pdfMode ? 72.0 : 22.0) : (pdfMode ? 18.0 : 8.0);
-    final bottomPad = pdfMode ? 64.0 : 34.0;
+    final rightPad = pdfMode ? 24.0 : 18.0;
+    final topPad = drawHeader ? (pdfMode ? 72.0 : 22.0) : (pdfMode ? 18.0 : 10.0);
+    final bottomPad = pdfMode ? 66.0 : (showXAxisLabels ? 34.0 : 14.0);
 
     final chartRect = Rect.fromLTRB(
       leftPad,
@@ -866,7 +880,7 @@ class AdvancedLinePainter extends CustomPainter {
       minY -= 1;
       maxY += 1;
     } else {
-      final pad = (maxY - minY) * 0.12;
+      final pad = (maxY - minY) * 0.14;
       minY -= pad;
       maxY += pad;
     }
@@ -919,7 +933,7 @@ class AdvancedLinePainter extends CustomPainter {
       final x = xForDate(only.x, chartRect, axisStartMs, axisRangeMs);
       final y = yForValue(only.value, chartRect, minY, yRange);
 
-      canvas.drawCircle(Offset(x, y), 3, Paint()..color = Colors.black.withValues(alpha: 0.88));
+      canvas.drawCircle(Offset(x, y), 3, Paint()..color = Colors.blue.withValues(alpha: 0.92));
 
     } else {
       final path = Path();
@@ -946,11 +960,11 @@ class AdvancedLinePainter extends CustomPainter {
       fillPath.close();
 
       final fillPaint = Paint()
-        ..color = Colors.black.withValues(alpha: 0.045)
+        ..color = Colors.blue.withValues(alpha: 0.08)
         ..style = PaintingStyle.fill;
 
       final linePaint = Paint()
-        ..color = Colors.black.withValues(alpha: 0.88)
+        ..color = Colors.blue.withValues(alpha: 0.92)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.2
         ..strokeCap = StrokeCap.round
@@ -959,22 +973,17 @@ class AdvancedLinePainter extends CustomPainter {
       canvas.drawPath(fillPath, fillPaint);
       canvas.drawPath(path, linePaint);
 
-      final dotPaint = Paint()
-        ..color = Colors.black.withValues(alpha: 0.88)
-        ..style = PaintingStyle.fill;
+      final lp = data.points.last;
+      final lx = xForDate(lp.x, chartRect, axisStartMs, axisRangeMs);
+      final ly = yForValue(lp.value, chartRect, minY, yRange);
 
-      for (int i = 0; i < data.points.length; i++) {
-        if (data.points.length > 80 &&
-            i % 4 != 0 &&
-            i != data.points.length - 1) {
-          continue;
-        }
-
-        final point = data.points[i];
-        final x = xForDate(point.x, chartRect, axisStartMs, axisRangeMs);
-        final y = yForValue(point.value, chartRect, minY, yRange);
-        canvas.drawCircle(Offset(x, y), 2.0, dotPaint);
-      }
+      canvas.drawCircle(Offset(lx, ly), 4.5, Paint()..color = Colors.white);
+      canvas.drawCircle(Offset(lx, ly), 4.5,
+        Paint()
+          ..color = Colors.blue.withValues(alpha: 0.96)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
     }
 
     if (drawHeader) {
@@ -982,7 +991,10 @@ class AdvancedLinePainter extends CustomPainter {
     }
 
     drawYLabels(canvas, chartRect, minY, maxY);
-    drawXLabels(canvas, chartRect, xTicks, axisStartMs, axisRangeMs);
+
+    if (showXAxisLabels) {
+      drawXLabels(canvas, chartRect, xTicks, axisStartMs, axisRangeMs);
+    }
   }
 
   double xForDate(DateTime date, Rect chartRect, double axisStartMs, double axisRangeMs) {
@@ -999,13 +1011,15 @@ class AdvancedLinePainter extends CustomPainter {
   List<DateTime> buildXAxisTicks() {
     switch (data.range) {
       case ChartRange.today:
-        return [
-          data.axisStart,
-          data.axisStart.add(const Duration(hours: 6)),
-          data.axisStart.add(const Duration(hours: 12)),
-          data.axisStart.add(const Duration(hours: 18)),
-          data.axisEnd,
-        ];
+        return List.generate(5, (i) {
+          final ratio = i / 4;
+          final millis = data.axisStart.millisecondsSinceEpoch +
+              ((data.axisEnd.millisecondsSinceEpoch -
+                  data.axisStart.millisecondsSinceEpoch) *
+                  ratio)
+                  .round();
+          return DateTime.fromMillisecondsSinceEpoch(millis);
+        });
       case ChartRange.week:
         return [
           data.axisStart,
@@ -1030,8 +1044,7 @@ class AdvancedLinePainter extends CustomPainter {
   String tickLabel(DateTime tick) {
     switch (data.range) {
       case ChartRange.today:
-        if (tick == data.axisEnd) return '23:59';
-        return '${tick.hour.toString().padLeft(2, '0')}:00';
+        return '${two(tick.hour)}:${two(tick.minute)}';
       case ChartRange.week:
       case ChartRange.month:
         return '${tick.day.toString().padLeft(2, '0')}/${tick.month.toString().padLeft(2, '0')}';
@@ -1058,7 +1071,7 @@ class AdvancedLinePainter extends CustomPainter {
       text: TextSpan(
         text: data.subtitle,
         style: TextStyle(
-          fontSize: pdfMode ? 16 : 12,
+          fontSize: pdfMode ? 18 : 12,
           color: Colors.black.withValues(alpha: 0.65),
         ),
       ),
@@ -1078,8 +1091,12 @@ class AdvancedLinePainter extends CustomPainter {
       final y = chartRect.top + (chartRect.height * i / steps);
 
       final tp = TextPainter(
-        text: TextSpan(text: compactNumber(value),
-          style: TextStyle(color: Colors.black87, fontSize: pdfMode ? 18 : 10),
+        text: TextSpan(
+          text: compactNumber(value),
+          style: TextStyle(
+            color: Colors.black87,
+            fontSize: pdfMode ? 18 : 10,
+          ),
         ),
         textDirection: TextDirection.ltr,
         maxLines: 1,
@@ -1100,8 +1117,12 @@ class AdvancedLinePainter extends CustomPainter {
       final x = xForDate(tick, chartRect, axisStartMs, axisRangeMs);
 
       final tp = TextPainter(
-        text: TextSpan(text: tickLabel(tick),
-          style: TextStyle(color: Colors.black87, fontSize: pdfMode ? 18 : 10),
+        text: TextSpan(
+          text: tickLabel(tick),
+          style: TextStyle(
+            color: Colors.black87,
+            fontSize: pdfMode ? 18 : 10,
+          ),
         ),
         textDirection: TextDirection.ltr,
         maxLines: 1,
@@ -1128,6 +1149,7 @@ class AdvancedLinePainter extends CustomPainter {
   bool shouldRepaint(covariant AdvancedLinePainter oldDelegate) {
     return oldDelegate.data != data ||
         oldDelegate.drawHeader != drawHeader ||
-        oldDelegate.pdfMode != pdfMode;
+        oldDelegate.pdfMode != pdfMode ||
+        oldDelegate.showXAxisLabels != showXAxisLabels;
   }
 }
