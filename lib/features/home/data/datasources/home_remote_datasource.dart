@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:iot_manager/core/error/app_exception.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HomeRemoteDatasource {
-
   HomeRemoteDatasource(this._client);
   final SupabaseClient _client;
+
+  SupabaseClient get client => _client;
 
   Future<Map<String, dynamic>> getOverview() async {
     try {
@@ -25,7 +25,7 @@ class HomeRemoteDatasource {
 
       final homesFuture = _client
           .from('homes')
-          .select('id, name, created_at')
+          .select('id, name, owner_id, created_at')
           .eq('owner_id', userId)
           .order('created_at', ascending: false);
 

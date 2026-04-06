@@ -1,140 +1,143 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
-
-import 'package:iot_manager/core/constants/home_strings.dart';
-import 'package:iot_manager/core/error/app_failure.dart';
-
-import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
+import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
+import 'package:iot_manager/features/devices/data/repositories/devices_repository_impl.dart';
 import 'package:iot_manager/features/home/data/datasources/home_remote_datasource.dart';
 import 'package:iot_manager/features/home/data/repositories/home_repository_impl.dart';
-import 'package:iot_manager/features/home/domain/entities/home_overview.dart';
-import 'package:iot_manager/features/home/domain/entities/home_summary.dart';
-import 'package:iot_manager/features/home/domain/usecases/create_home.dart';
-import 'package:iot_manager/features/home/domain/usecases/delete_home.dart';
-import 'package:iot_manager/features/home/domain/usecases/get_home_overview.dart';
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HomeController extends ChangeNotifier {
-
-  HomeController(this.getHomeOverview, this.createHomeUseCase, this.deleteHomeUseCase,);
+  HomeController._(this.homeRepo, this._deviceRepo);
 
   factory HomeController.create() {
     final client = Supabase.instance.client;
-    final datasource = HomeRemoteDatasource(client);
-    final repository = HomeRepositoryImpl(datasource);
 
-    final overviewUseCase = GetHomeOverview(repository);
-    final createUseCase = CreateHome(repository);
-    final deleteUseCase = DeleteHome(repository);
-
-    return HomeController(
-      overviewUseCase,
-      createUseCase,
-      deleteUseCase,
+    return HomeController._(
+      HomeRepositoryImpl(HomeRemoteDatasource(client)),
+      DevicesRepositoryImpl(DevicesRemoteDatasource()),
     );
   }
-  final GetHomeOverview getHomeOverview;
-  final CreateHome createHomeUseCase;
-  final DeleteHome deleteHomeUseCase;
 
-  bool isLoading = false;
-  bool isCreatingHome = false;
-  String? deletingHomeId;
-  String? errorMessages;
-  HomeOverview? overview;
+  final HomeRepositoryImpl homeRepo;
+  final DevicesRepositoryImpl _deviceRepo;
 
-  bool get loading => isLoading;
-  bool get creatingHome => isCreatingHome;
-  bool get deletingHome => deletingHomeId != null;
-  String? get deletingId => deletingHomeId;
-  String? get errorMessage => errorMessages;
-  String get firstName => overview?.firstName ?? '';
-  List<HomeSummary> get homes => overview?.homes ?? const [];
-  List<DeviceItem> get devices => overview?.devices ?? const [];
-  int get totalHomes => overview?.totalHomes ?? 0;
-  int get totalDevices => overview?.totalDevices ?? 0;
-  int get activeDevices => overview?.activeDevices ?? 0;
-  double get totalTodayWh => overview?.totalTodayWh ?? 0;
+  bool loading = false;
+  String? errorMessage;
+  dynamic overview;
+
+  String firstName = '';
+
+  int totalHomes = 0;
+  int totalDevices = 0;
+  int activeDevices = 0;
+  double totalTodayWh = 0;
+  int incidentsCount = 0;
+
+  bool creatingHome = false;
+  String? deletingId;
+
+  List get homes => overview?.homes ?? [];
+
+  Timer? timer;
 
   Future<void> load() async {
-    setLoading(true);
-    clearError();
-
-    try {
-      overview = await getHomeOverview();
-    } on AppFailure catch (e) {
-      setError(e.message);
-    } catch (_) {
-      setError(HomeStrings.errorLoadInformationHome);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  Future<bool> createHome(String name) async {
-    final trimmed = name.trim();
-    if (trimmed.isEmpty) {
-      setError(HomeStrings.errorNotNameHome);
-      return false;
-    }
-
-    isCreatingHome = true;
-    clearError();
+    loading = true;
+    errorMessage = null;
     notifyListeners();
 
     try {
-      await createHomeUseCase(name: trimmed);
+      final data = await homeRepo.getOverview();
+      overview = data;
+      firstName = data.firstName;
+      await calculateStats();
+      startAutoRefresh();
+    } catch (e) {
+      errorMessage = e.toString();
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> calculateStats() async {
+    final devices = overview?.devices ?? [];
+
+    totalHomes = homes.length;
+    totalDevices = devices.length;
+    activeDevices = 0;
+    totalTodayWh = 0;
+
+    for (final d in devices) {
+      final isActive = await _deviceRepo.isDeviceActive(d);
+      if (isActive) {
+        activeDevices++;
+      }
+
+      totalTodayWh += (d.energyTodayWh ?? 0);
+    }
+  }
+
+  void startAutoRefresh() {
+    timer?.cancel();
+    timer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      try {
+        if (overview == null) return;
+        await calculateStats();
+        notifyListeners();
+      } catch (_) {}
+    });
+  }
+
+  Future<bool> createHome(String name) async {
+    creatingHome = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      await homeRepo.createHome(name: name);
       await load();
       return true;
-    } on AppFailure catch (e) {
-      setError(e.message);
-      return false;
-    } catch (_) {
-      setError(HomeStrings.notConfirmationCreateHome);
+    } catch (e) {
+      errorMessage = e.toString();
       return false;
     } finally {
-      isCreatingHome = false;
+      creatingHome = false;
       notifyListeners();
     }
   }
 
   Future<bool> deleteHome(String homeId) async {
-    if (homeId.trim().isEmpty) {
-      setError(HomeStrings.errorIdentifyHome);
-      return false;
-    }
-
-    deletingHomeId = homeId;
-    clearError();
+    deletingId = homeId;
+    errorMessage = null;
     notifyListeners();
 
     try {
-      await deleteHomeUseCase(homeId: homeId);
+      await homeRepo.deleteHome(homeId: homeId);
       await load();
       return true;
-    } on AppFailure catch (e) {
-      setError(e.message);
-      return false;
-    } catch (_) {
-      setError(HomeStrings.notConfirmationDeleteHome);
+    } catch (e) {
+      errorMessage = e.toString();
       return false;
     } finally {
-      deletingHomeId = null;
+      deletingId = null;
       notifyListeners();
     }
   }
 
-  void setLoading(bool value) {
-    isLoading = value;
-    notifyListeners();
+  Future<void> loadIncidents(String homeId) async {
+    try {
+      incidentsCount = await homeRepo.getActiveIncidentsCount(homeId);
+      notifyListeners();
+    } catch (e) {
+      errorMessage = e.toString();
+      notifyListeners();
+    }
   }
 
-  void setError(String message) {
-    errorMessages = message;
-    notifyListeners();
-  }
-
-  void clearError() {
-    errorMessages = null;
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
   }
 }

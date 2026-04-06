@@ -1,23 +1,26 @@
 class HomeSummary {
-
-  const HomeSummary({
+  HomeSummary({
     required this.id,
     required this.name,
+    required this.ownerId,
     required this.createdAt,
   });
 
   factory HomeSummary.fromMap(Map<String, dynamic> map) {
+    final rawName = (map['name'] ?? '').toString().trim();
+
     return HomeSummary(
       id: (map['id'] ?? '').toString(),
-      name: ((map['name'] ?? '') as String).trim().isEmpty
-          ? 'Hogar sin nombre'
-          : (map['name'] as String).trim(),
+      name: rawName.isEmpty ? 'Hogar sin nombre' : rawName,
+      ownerId: (map['owner_id'] ?? '').toString(),
       createdAt: map['created_at'] == null
           ? null
           : DateTime.tryParse(map['created_at'].toString()),
     );
   }
+
   final String id;
-  final String name;
+  String name;
+  final String ownerId;
   final DateTime? createdAt;
 }

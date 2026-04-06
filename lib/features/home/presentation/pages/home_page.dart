@@ -7,6 +7,7 @@ import 'package:iot_manager/core/constants/home_strings.dart';
 import 'package:iot_manager/core/widgets/glass_card.dart';
 
 import 'package:iot_manager/features/home/presentation/controllers/home_controller.dart';
+import 'package:iot_manager/features/home/presentation/pages/home_detail_page.dart';
 import 'package:iot_manager/features/home/presentation/widgets/home_summary_card.dart';
 import 'package:iot_manager/features/home/presentation/widgets/quick_stat_card.dart';
 
@@ -256,7 +257,7 @@ class HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               const Expanded(
-                child: _SectionHeader(
+                child: SectionHeader(
                   title: HomeStrings.yourHomes,
                   subtitle: '',
                 ),
@@ -285,24 +286,25 @@ class HomePageState extends State<HomePage> {
               actionLabel: HomeStrings.newHome,
               onAction:
               controller.creatingHome ? null : showCreateHomeDialog,
-            )
-                : Column(
-              children: controller.homes
-                  .map(
-                    (home) => Padding(
+            ) : Column(
+              children: controller.homes.map((home) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: HomeSummaryCard(
-                    name: home.name,
-                    subtitle: home.createdAt == null
-                        ? HomeStrings.createHomeRecently
-                        : 'Creado el ${home.createdAt!.day.toString().padLeft(2, '0')}/${home.createdAt!.month.toString().padLeft(2, '0')}/${home.createdAt!.year}',
-                    icon: Icons.house_siding_rounded,
-                    deleting: controller.deletingId == home.id,
-                    onDelete: controller.deletingId != null
-                        ? null
-                        : () => confirmDeleteHome(
-                      homeId: home.id,
-                      homeName: home.name,
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => HomeDetailPage(home: home)),
+                      );
+                    },
+                    child: HomeSummaryCard(
+                      name: home.name,
+                      subtitle: home.createdAt == null ? HomeStrings.createHomeRecently
+                          : 'Creado el ${home.createdAt!.day.toString().padLeft(2, '0')}/${home.createdAt!.month.toString().padLeft(2, '0')}/${home.createdAt!.year}',
+                      icon: Icons.house_siding_rounded,
+                      deleting: controller.deletingId == home.id,
+                      onDelete: controller.deletingId != null ? null : () => confirmDeleteHome(
+                        homeId: home.id,
+                        homeName: home.name,
+                      ),
                     ),
                   ),
                 ),
@@ -316,9 +318,8 @@ class HomePageState extends State<HomePage> {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-
-  const _SectionHeader({required this.title, required this.subtitle});
+class SectionHeader extends StatelessWidget {
+  const SectionHeader({super.key, required this.title, required this.subtitle});
   final String title;
   final String subtitle;
 
@@ -350,7 +351,6 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _EmptyBlock extends StatelessWidget {
-
   const _EmptyBlock({
     required this.title,
     required this.subtitle,
@@ -358,6 +358,7 @@ class _EmptyBlock extends StatelessWidget {
     this.actionLabel,
     this.onAction,
   });
+
   final String title;
   final String subtitle;
   final IconData icon;

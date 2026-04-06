@@ -216,6 +216,34 @@ class NotificationsRemoteDatasource {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getNotifications() async {
+    final deviceInvites = await _client
+        .from('device_shares')
+        .select()
+        .eq('status', 'pending');
+
+    final homeInvites = await _client
+        .from('home_shares')
+        .select()
+        .eq('status', 'pending');
+
+    final deviceList = deviceInvites.map((e) {
+      return {
+        ...e,
+        'type': 'device_invitation',
+      };
+    });
+
+    final homeList = homeInvites.map((e) {
+      return {
+        ...e,
+        'type': 'home_invitation',
+      };
+    });
+
+    return [...deviceList, ...homeList];
+  }
+
   String requireUserId() {
     final userId = _client.auth.currentUser?.id;
     if (userId == null || userId.isEmpty) {
