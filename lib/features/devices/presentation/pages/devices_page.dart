@@ -194,7 +194,7 @@ class DevicesPageState extends State<DevicesPage> {
                       if (controller.errorMessage == null) {
                         navigator.pop();
                         messenger.showSnackBar(
-                          const SnackBar(content: Text(DevicesStrings.addDeviceSucesful))
+                          const SnackBar(content: Text(DevicesStrings.addDeviceSucesful)),
                         );
                       } else {
                         messenger.showSnackBar(SnackBar(content: Text(controller.errorMessage!)));
@@ -286,15 +286,19 @@ class DevicesPageState extends State<DevicesPage> {
           child: DeviceCard(
             device: controller.devices[index],
             onTap: () async {
-              await Navigator.of(context).push(
+              final updated = await Navigator.of(context).push<bool>(
                 MaterialPageRoute(
                   builder: (_) => DevicePanelPage(
                     device: controller.devices[index],
                   ),
                 ),
               );
+
               if (!mounted) return;
-              await controller.load();
+
+              if (updated == true) {
+                await controller.load();
+              }
             },
             onToggle: (value) async {
               await controller.toggleDevice(

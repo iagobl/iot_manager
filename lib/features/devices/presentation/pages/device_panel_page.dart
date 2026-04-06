@@ -69,6 +69,11 @@ class DevicePanelPageState extends State<DevicePanelPage> {
     setState(() {});
   }
 
+  void closeWithRefresh() {
+    if (!mounted) return;
+    Navigator.of(context).pop(true);
+  }
+
   @override
   void dispose() {
     controller.removeListener(onControllerChanged);
@@ -80,54 +85,61 @@ class DevicePanelPageState extends State<DevicePanelPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-              child: DevicePanelTopBar(
-                deviceName: currentDeviceName.length > 18
-                    ? '${currentDeviceName.substring(0, 18)}…'
-                    : currentDeviceName,
-                deviceIdentifier: widget.device.identifier,
-                isLoading: controller.loading,
-                onBack: () => Navigator.of(context).pop(),
-                onRefresh: controller.loading ? null : controller.refresh,
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 20),
-                child: Row(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 10, 12),
-                      child: DeviceDetailSidebar(
-                        selectedSection: selectedSection,
-                        onSectionSelected: (section) {
-                          setState(() {
-                            selectedSection = section;
-                          });
-                        },
-                      ),
-                    ),
-                    Expanded(
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 180),
-                        child: Padding(
-                          key: ValueKey(selectedSection),
-                          padding: const EdgeInsets.fromLTRB(0, 0, 12, 12),
-                          child: buildSection(context),
-                        ),
-                      ),
-                    ),
-                  ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        closeWithRefresh();
+      },
+      child: Scaffold(
+        backgroundColor: colorScheme.surface,
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+                child: DevicePanelTopBar(
+                  deviceName: currentDeviceName.length > 18
+                      ? '${currentDeviceName.substring(0, 18)}…'
+                      : currentDeviceName,
+                  deviceIdentifier: widget.device.identifier,
+                  isLoading: controller.loading,
+                  onBack: closeWithRefresh,
+                  onRefresh: controller.loading ? null : controller.refresh,
                 ),
               ),
-            ),
-          ],
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 20),
+                  child: Row(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 10, 12),
+                        child: DeviceDetailSidebar(
+                          selectedSection: selectedSection,
+                          onSectionSelected: (section) {
+                            setState(() {
+                              selectedSection = section;
+                            });
+                          },
+                        ),
+                      ),
+                      Expanded(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          child: Padding(
+                            key: ValueKey(selectedSection),
+                            padding: const EdgeInsets.fromLTRB(0, 0, 12, 12),
+                            child: buildSection(context),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -215,14 +227,8 @@ class DevicePanelPageState extends State<DevicePanelPage> {
             currentDeviceName = newName;
           });
         },
-        onUpdateStarted: () {
-          if (!mounted) return;
-          Navigator.of(context).pop(true);
-        },
-        onDeviceRemoved: () {
-          if (!mounted) return;
-          Navigator.of(context).pop(true);
-        },
+        onUpdateStarted: closeWithRefresh,
+        onDeviceRemoved: closeWithRefresh,
       );
     }
 
