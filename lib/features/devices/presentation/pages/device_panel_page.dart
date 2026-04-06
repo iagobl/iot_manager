@@ -282,7 +282,7 @@ class DevicePanelPageState extends State<DevicePanelPage> {
               ),
               DeviceMetricCard(
                 title: DevicesPanelStrings.current,
-                value: formatNumber(controller.currentA),
+                value: formatCurrent(controller.currentA),
                 unit: 'A',
                 icon: Icons.tune_rounded,
               ),
@@ -316,5 +316,21 @@ class DevicePanelPageState extends State<DevicePanelPage> {
       return value.toInt().toString();
     }
     return value.toStringAsFixed(1);
+  }
+
+  String formatCurrent(double value) {
+    if (value <= 0) {
+      return '0';
+    }
+
+    if (value < 0.1) {
+      return value.toStringAsFixed(3);
+    }
+
+    if (value < 1) {
+      return value.toStringAsFixed(2);
+    }
+
+    return formatNumber(value);
   }
 }

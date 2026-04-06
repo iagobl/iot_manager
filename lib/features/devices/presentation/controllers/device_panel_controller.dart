@@ -52,8 +52,6 @@ class DevicePanelController extends ChangeNotifier {
   int _uptimeSeconds = 0;
 
   Timer? pollTimer;
-  DateTime? _lastReadingSampleAt;
-  double? _lastDeviceEnergyTotalWh;
 
   bool get loading => _loading;
   bool get busyPowerAction => _busyPowerAction;
@@ -134,8 +132,6 @@ class DevicePanelController extends ChangeNotifier {
         _energyTodayWh = device.energyTodayWh;
       }
 
-      await persistReadingSample(switchStatus: switchStatus, force: true);
-
       _errorMessage = null;
       notifyListeners();
     } catch (error) {
@@ -208,7 +204,13 @@ class DevicePanelController extends ChangeNotifier {
 
       final currentVoltage = readDouble(switchStatus, const ['voltage']);
       final currentPower = readDouble(switchStatus, const ['apower', 'power']);
-      final currentCurrent = readDouble(switchStatus, const ['current']);
+
+      final rawCurrent = readDouble(switchStatus, const ['current']);
+      final currentCurrent = normalizeCurrentA(
+        rawCurrent: rawCurrent,
+        powerW: currentPower,
+        voltageV: currentVoltage,
+      );
 
       final voltageLimit = _toDouble(config['voltage_limit']);
       final powerLimit = _toDouble(config['power_limit']);
@@ -245,7 +247,10 @@ class DevicePanelController extends ChangeNotifier {
       }
 
       return null;
-    } catch (_) {
+    } catch (error) {
+      final failure = ErrorMapper.mapFailure(error);
+      _errorMessage = failure.message;
+      notifyListeners();
       return null;
     }
   }
@@ -265,87 +270,28 @@ class DevicePanelController extends ChangeNotifier {
 
   void startPolling() {
     pollTimer?.cancel();
-    pollTimer = Timer.periodic(
-      const Duration(seconds: 5), (_) => unawaited(refreshSilently()),
-    );
-  }
+    pollTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+      try {
+        final switchStatus = await rpcClient.getSwitchStatus();
 
-  Future<void> refreshSilently() async {
-    if (_loading || _busyPowerAction) return;
-
-    try {
-      final switchStatus = await rpcClient.getSwitchStatus();
-      final deviceInfo = await rpcClient.getDeviceInfo();
-      final wifiStatus = await rpcClient.getWifiStatus();
-      final systemStatus = await rpcClient.getSystemStatus();
-
-      applySwitchStatus(switchStatus);
-      applyDeviceInfo(deviceInfo);
-      applyWifiStatus(wifiStatus);
-      applySystemStatus(systemStatus);
-
-      await persistReadingSample(switchStatus: switchStatus);
-
-      if (_errorMessage != null) {
-        _errorMessage = null;
-      }
-
-      notifyListeners();
-    } catch (error) {
-      final failure = ErrorMapper.mapFailure(error);
-      if (_errorMessage == null) {
-        _errorMessage = failure.message;
-        notifyListeners();
-      }
-    }
-  }
-
-  Future<void> persistReadingSample({
-    required Map<String, dynamic> switchStatus,
-    bool force = false,
-  }) async {
-    final now = DateTime.now().toUtc();
-
-    if (!force && _lastReadingSampleAt != null) {
-      final elapsed = now.difference(_lastReadingSampleAt!);
-      if (elapsed.inSeconds < 10) return;
-    }
-
-    try {
-      final deviceEnergyTotalWh = readDouble(
-        switchStatus,
-        const ['aenergy.total', 'energy.total'],
-      );
-
-      double energySampleWh = 0;
-      if (_lastReadingSampleAt != null) {
-        final elapsedSeconds = now.difference(_lastReadingSampleAt!).inSeconds;
-
-        if (elapsedSeconds > 0) {
-          if (deviceEnergyTotalWh > 0 &&
-              _lastDeviceEnergyTotalWh != null &&
-              deviceEnergyTotalWh >= _lastDeviceEnergyTotalWh!) {
-            energySampleWh = deviceEnergyTotalWh - _lastDeviceEnergyTotalWh!;
-          } else {
-            energySampleWh = _powerW * (elapsedSeconds / 3600.0);
-          }
+        if (!(_hasPendingUpdate || _needsReboot)) {
+          final deviceInfo = await rpcClient.getDeviceInfo();
+          applyDeviceInfo(deviceInfo);
         }
-      }
 
-      await remoteDatasource.insertReadingSample(
-        deviceId: device.id,
-        timestamp: now,
-        powerW: _powerW,
-        voltageV: _voltageV,
-        energyWh: energySampleWh < 0 ? 0 : energySampleWh,
-      );
+        applySwitchStatus(switchStatus);
 
-      _lastReadingSampleAt = now;
-      if (deviceEnergyTotalWh > 0) {
-        _lastDeviceEnergyTotalWh = deviceEnergyTotalWh;
-      }
-    } catch (_) {
-    }
+        if (DateTime.now().second % 20 == 0) {
+          final wifiStatus = await rpcClient.getWifiStatus();
+          final systemStatus = await rpcClient.getSystemStatus();
+          applyWifiStatus(wifiStatus);
+          applySystemStatus(systemStatus);
+        }
+
+        _errorMessage = null;
+        notifyListeners();
+      } catch (_) {}
+    });
   }
 
   void applySwitchStatus(Map<String, dynamic> switchStatus) {
@@ -354,7 +300,14 @@ class DevicePanelController extends ChangeNotifier {
     _isOn = readBool(switchStatus, const ['output']);
     _powerW = readDouble(switchStatus, const ['apower', 'power']);
     _voltageV = readDouble(switchStatus, const ['voltage']);
-    _currentA = readDouble(switchStatus, const ['current']);
+
+    final rawCurrent = readDouble(switchStatus, const ['current']);
+    _currentA = normalizeCurrentA(
+      rawCurrent: rawCurrent,
+      powerW: _powerW,
+      voltageV: _voltageV,
+    );
+
     _temperatureC = readTemperatureC(switchStatus);
 
     final parsedEnergy = readDouble(
@@ -635,6 +588,26 @@ class DevicePanelController extends ChangeNotifier {
 
     final single = readNestedValue(source, 'temperature');
     if (single is num) return single.toDouble();
+
+    return 0;
+  }
+
+  double normalizeCurrentA({
+    required double rawCurrent,
+    required double powerW,
+    required double voltageV,
+  }) {
+    if (rawCurrent > 0) {
+      return rawCurrent;
+    }
+
+    if (powerW > 0 && voltageV > 0) {
+      final estimated = powerW / voltageV;
+
+      if (estimated.isFinite && estimated > 0) {
+        return estimated;
+      }
+    }
 
     return 0;
   }
