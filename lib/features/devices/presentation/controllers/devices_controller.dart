@@ -9,12 +9,10 @@ import 'package:iot_manager/core/iot/shelly/shelly_rpc_client.dart';
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
 import 'package:iot_manager/features/devices/data/repositories/devices_repository_impl.dart';
 import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
-
 import 'package:iot_manager/features/devices/domain/usecases/get_user_devices.dart';
 
 class DevicesController extends ChangeNotifier {
-
-  DevicesController(
+  DevicesController._(
       this.getUserDevices,
       this.remoteDatasource,
       );
@@ -24,27 +22,29 @@ class DevicesController extends ChangeNotifier {
     final repository = DevicesRepositoryImpl(datasource);
     final usecase = GetUserDevices(repository);
 
-    return DevicesController(usecase, datasource);
+    return DevicesController._(usecase, datasource);
   }
+
   final GetUserDevices getUserDevices;
   final DevicesRemoteDatasource remoteDatasource;
 
   bool isLoading = false;
   String? errorMessages;
-  List<DeviceItem> items = [];
-  List<DiscoveredIotDevice> discoveredDevices = [];
+  List<DeviceItem> isDevices = <DeviceItem>[];
+  List<DiscoveredIotDevice> discoveredDevices = <DiscoveredIotDevice>[];
 
   bool get loading => isLoading;
   String? get errorMessage => errorMessages;
-  List<DeviceItem> get devices => items;
+  List<DeviceItem> get devices => isDevices;
   List<DiscoveredIotDevice> get scannedDevices => discoveredDevices;
 
   Future<void> load() async {
     setLoading(true);
-    clearError();
+    clearError(notify: false);
 
     try {
-      items = await getUserDevices();
+      isDevices = await getUserDevices();
+      discoveredDevices = <DiscoveredIotDevice>[];
     } catch (error) {
       final failure = ErrorMapper.mapFailure(error);
       setError(failure.message);
@@ -59,7 +59,7 @@ class DevicesController extends ChangeNotifier {
     required String identifier,
   }) async {
     setLoading(true);
-    clearError();
+    clearError(notify: false);
 
     try {
       await remoteDatasource.createManualDevice(
@@ -67,7 +67,7 @@ class DevicesController extends ChangeNotifier {
         deviceType: deviceType,
         identifier: identifier,
       );
-      items = await getUserDevices();
+      isDevices = await getUserDevices();
     } catch (error) {
       final failure = ErrorMapper.mapFailure(error);
       setError(failure.message);
@@ -90,15 +90,16 @@ class DevicesController extends ChangeNotifier {
 
   Future<void> discoverDevicesInLan() async {
     setLoading(true);
-    clearError();
+    clearError(notify: false);
 
     try {
-      items = await getUserDevices();
+      final currentDevices = await getUserDevices();
+      isDevices = currentDevices;
 
       final discovery = ShellyLanDiscovery();
       final foundDevices = await discovery.discoverAll(maxResults: 50);
 
-      final existingIdentifiers = items
+      final existingIdentifiers = currentDevices
           .map((device) => device.identifier.trim().toLowerCase())
           .where((identifier) => identifier.isNotEmpty).toSet();
 
@@ -107,10 +108,7 @@ class DevicesController extends ChangeNotifier {
       for (final device in foundDevices) {
         final normalizedIp = device.ip.trim().toLowerCase();
         if (normalizedIp.isEmpty) continue;
-
-        if (existingIdentifiers.contains(normalizedIp)) {
-          continue;
-        }
+        if (existingIdentifiers.contains(normalizedIp)) continue;
 
         uniqueByIp[normalizedIp] = device;
       }
@@ -131,6 +129,8 @@ class DevicesController extends ChangeNotifier {
   }
 
   Future<void> toggleDevice(DeviceItem device, bool on) async {
+    clearError(notify: false);
+
     try {
       final rpc = ShellyRpcClient(host: device.identifier);
       await rpc.setSwitch(on: on);
@@ -152,8 +152,10 @@ class DevicesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void clearError() {
+  void clearError({bool notify = true}) {
     errorMessages = null;
-    notifyListeners();
+    if (notify) {
+      notifyListeners();
+    }
   }
 }

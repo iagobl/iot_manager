@@ -355,8 +355,12 @@ class DevicePanelController extends ChangeNotifier {
         severity: incident['severity'] as int? ?? 3,
       );
 
+      await remoteDatasource.updateDeviceState(device.id, false);
+
+      _isOn = false;
       _autoShutdownIncidentRecorded = true;
       _lastAutoShutdownKey = incidentKey;
+      notifyListeners();
     } catch (error) {
       final failure = ErrorMapper.mapFailure(error);
       _errorMessage = failure.message;

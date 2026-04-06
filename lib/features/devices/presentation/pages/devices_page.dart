@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:iot_manager/core/constants/app_strings.dart';
@@ -20,8 +22,11 @@ class DevicesPage extends StatefulWidget {
 class DevicesPageState extends State<DevicesPage> {
   late final DevicesController controller;
 
+  Timer? pollTimer;
+  bool silentRefreshing = false;
+
   Future<void> refreshFromShell() async {
-    await controller.load();
+    await silentRefresh();
   }
 
   @override
@@ -30,6 +35,7 @@ class DevicesPageState extends State<DevicesPage> {
     controller = DevicesController.create();
     controller.addListener(onControllerChanged);
     controller.load();
+    startPolling();
   }
 
   void onControllerChanged() {
@@ -37,8 +43,29 @@ class DevicesPageState extends State<DevicesPage> {
     setState(() {});
   }
 
+  void startPolling() {
+    pollTimer?.cancel();
+    pollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (!mounted) return;
+      if (controller.loading || silentRefreshing) return;
+      await silentRefresh();
+    });
+  }
+
+  Future<void> silentRefresh() async {
+    if (!mounted || silentRefreshing) return;
+
+    setState(() {silentRefreshing = true;});
+
+    await controller.load();
+    if (!mounted) return;
+
+    setState(() {silentRefreshing = false;});
+  }
+
   @override
   void dispose() {
+    pollTimer?.cancel();
     controller.removeListener(onControllerChanged);
     controller.dispose();
     super.dispose();
@@ -242,9 +269,41 @@ class DevicesPageState extends State<DevicesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: _buildBody(),
+      body: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: _buildBody(),
+          ),
+          if (silentRefreshing && controller.devices.isNotEmpty)
+            Positioned(
+              top: 8,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: [
+                      BoxShadow(
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                        color: Colors.black.withValues(alpha: 0.08),
+                      ),
+                    ],
+                  ),
+                  child: const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: controller.loading ? null : openAddOptions,
@@ -256,7 +315,7 @@ class DevicesPageState extends State<DevicesPage> {
   }
 
   Widget _buildBody() {
-    if (controller.loading) {
+    if (controller.loading && controller.devices.isEmpty) {
       return const Center(
         child: CircularProgressIndicator(),
       );
@@ -290,7 +349,7 @@ class DevicesPageState extends State<DevicesPage> {
           child: DeviceCard(
             device: controller.devices[index],
             onTap: () async {
-              final updated = await Navigator.of(context).push<bool>(
+              await Navigator.of(context).push<bool>(
                 MaterialPageRoute(
                   builder: (_) => DevicePanelPage(
                     device: controller.devices[index],
@@ -299,10 +358,7 @@ class DevicesPageState extends State<DevicesPage> {
               );
 
               if (!mounted) return;
-
-              if (updated == true) {
-                await controller.load();
-              }
+              await silentRefresh();
             },
             onToggle: (value) async {
               await controller.toggleDevice(
