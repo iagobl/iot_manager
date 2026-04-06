@@ -18,7 +18,10 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int currentIndex = 0;
-  int devicesRefreshKey = 0;
+
+  final GlobalKey<HomePageState> _homeKey = GlobalKey<HomePageState>();
+  final GlobalKey<DevicesPageState> _devicesKey =
+  GlobalKey<DevicesPageState>();
 
   late final NotificationsController notificationsController;
 
@@ -43,14 +46,9 @@ class _AppShellState extends State<AppShell> {
   }
 
   void rebuild() {
-    if (mounted) setState(() {});
-  }
-
-  void refreshDevicesTab() {
-    if (!mounted) return;
-    setState(() {
-      devicesRefreshKey++;
-    });
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _logout() async {
@@ -84,7 +82,8 @@ class _AppShellState extends State<AppShell> {
           controller: notificationsController,
           onInvitationsChanged: () async {
             await notificationsController.load();
-            refreshDevicesTab();
+            await _devicesKey.currentState?.refreshFromShell();
+            await _homeKey.currentState?.refreshFromTabReselect();
           },
         ),
       ),
@@ -93,22 +92,28 @@ class _AppShellState extends State<AppShell> {
 
   List<Widget> buildPages() {
     return [
-      const HomePage(),
+      HomePage(key: _homeKey),
       const AnalyticsPage(),
-      DevicesPage(
-        key: ValueKey(devicesRefreshKey),
-      ),
+      DevicesPage(key: _devicesKey),
     ];
   }
 
-  void onDestinationSelected(int index) {
-    setState(() {
-      currentIndex = index;
+  Future<void> onDestinationSelected(int index) async {
+    final isReselect = index == currentIndex;
 
-      if (index == 2) {
-        devicesRefreshKey++;
-      }
-    });
+    if (!isReselect) {
+      setState(() {
+        currentIndex = index;
+      });
+
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    if (index == 0) {
+      await _homeKey.currentState?.refreshFromTabReselect();
+    } else if (index == 2) {
+      await _devicesKey.currentState?.refreshFromShell();
+    }
   }
 
   @override
@@ -162,7 +167,9 @@ class _AppShellState extends State<AppShell> {
             selectedIndex: currentIndex,
             indicatorColor: cs.primary.withValues(alpha: 0.14),
             labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-            onDestinationSelected: onDestinationSelected,
+            onDestinationSelected: (index) async {
+              await onDestinationSelected(index);
+            },
             destinations: const [
               NavigationDestination(
                 icon: Icon(Icons.home_outlined),

@@ -21,6 +21,10 @@ class HomePage extends StatefulWidget {
 class HomePageState extends State<HomePage> {
   late final HomeController controller;
 
+  Future<void> refreshFromTabReselect() async {
+    await controller.refresh();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -131,8 +135,7 @@ class HomePageState extends State<HomePage> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          ok
+        content: Text(ok
               ? HomeStrings.confirmationDeleteHome
               : (controller.errorMessage ?? HomeStrings.notConfirmationDeleteHome),
         ),
@@ -175,128 +178,161 @@ class HomePageState extends State<HomePage> {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: controller.load,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 110),
-        children: [
-          RepaintBoundary(
-            child: GlassCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return Stack(
+      children: [
+        RefreshIndicator(
+          onRefresh: controller.refresh,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 110),
+            children: [
+              RepaintBoundary(
+                child: GlassCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(AuthStrings.helloUser + welcomeName,
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(HomeStrings.descriptionHome,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              RepaintBoundary(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final itemWidth = (constraints.maxWidth - 12) / 2;
+
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        SizedBox(
+                          width: itemWidth,
+                          height: 160,
+                          child: DevicesOverviewCard(
+                            totalDevices: controller.totalDevices,
+                            activeDevices: controller.activeDevices,
+                          ),
+                        ),
+                        SizedBox(
+                          width: itemWidth,
+                          height: 160,
+                          child: QuickStatCard(
+                            label: HomeStrings.consumptionToday,
+                            value:
+                            '${controller.totalTodayWh.toStringAsFixed(0)} Wh',
+                            icon: Icons.energy_savings_leaf_outlined,
+                            valueFontSize: 24,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(AuthStrings.helloUser + welcomeName,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
+                  const Expanded(
+                    child: SectionHeader(
+                      title: HomeStrings.yourHomes,
+                      subtitle: '',
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(HomeStrings.descriptionHome,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  const SizedBox(width: 12),
+                  FilledButton.icon(
+                    onPressed: controller.creatingHome ? null : showCreateHomeDialog,
+                    icon: controller.creatingHome
+                        ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                        : const Icon(Icons.add_home_outlined),
+                    label: const Text(AppStrings.create),
                   ),
                 ],
               ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          RepaintBoundary(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final itemWidth = (constraints.maxWidth - 12) / 2;
-
-                return Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    SizedBox(
-                      width: itemWidth,
-                      height: 160,
-                      child: DevicesOverviewCard(
-                        totalDevices: controller.totalDevices,
-                        activeDevices: controller.activeDevices,
+              const SizedBox(height: 12),
+              RepaintBoundary(
+                child: controller.homes.isEmpty
+                    ? _EmptyBlock(
+                  title: HomeStrings.descriptionNewHome,
+                  subtitle: HomeStrings.warningNewHome,
+                  icon: Icons.home_outlined,
+                  actionLabel: HomeStrings.newHome,
+                  onAction:
+                  controller.creatingHome ? null : showCreateHomeDialog,
+                ) : Column(
+                  children: controller.homes.map((home) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(context,
+                            MaterialPageRoute(builder: (_) => HomeDetailPage(home: home),
+                            ),
+                          );
+                        },
+                        child: HomeSummaryCard(
+                          name: home.name,
+                          subtitle:
+                          '${controller.getDeviceCountForHome(home.id)} dispositivos',
+                          icon: Icons.house_siding_rounded,
+                          deleting: controller.deletingId == home.id,
+                          onDelete: controller.deletingId != null ? null : () => confirmDeleteHome(
+                            homeId: home.id,
+                            homeName: home.name,
+                          ),
+                        ),
                       ),
                     ),
-                    SizedBox(
-                      width: itemWidth,
-                      height: 160,
-                      child: QuickStatCard(
-                        label: HomeStrings.consumptionToday,
-                        value:
-                        '${controller.totalTodayWh.toStringAsFixed(0)} Wh',
-                        icon: Icons.energy_savings_leaf_outlined,
-                        valueFontSize: 24,
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 22),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const Expanded(
-                child: SectionHeader(
-                  title: HomeStrings.yourHomes,
-                  subtitle: '',
+                  )
+                      .toList(),
                 ),
-              ),
-              const SizedBox(width: 12),
-              FilledButton.icon(
-                onPressed: controller.creatingHome ? null : showCreateHomeDialog,
-                icon: controller.creatingHome
-                    ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-                    : const Icon(Icons.add_home_outlined),
-                label: const Text(AppStrings.create),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          RepaintBoundary(
-            child: controller.homes.isEmpty
-                ? _EmptyBlock(
-              title: HomeStrings.descriptionNewHome,
-              subtitle: HomeStrings.warningNewHome,
-              icon: Icons.home_outlined,
-              actionLabel: HomeStrings.newHome,
-              onAction:
-              controller.creatingHome ? null : showCreateHomeDialog,
-            ) : Column(
-              children: controller.homes.map((home) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => HomeDetailPage(home: home)),
-                      );
-                    },
-                    child: HomeSummaryCard(
-                      name: home.name,
-                      subtitle:
-                      '${controller.getDeviceCountForHome(home.id)} dispositivos',
-                      icon: Icons.house_siding_rounded,
-                      deleting: controller.deletingId == home.id,
-                      onDelete: controller.deletingId != null ? null : () => confirmDeleteHome(
-                        homeId: home.id,
-                        homeName: home.name,
-                      ),
+        ),
+        if (controller.refreshing)
+          Positioned(
+            top: 8,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [
+                    BoxShadow(
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                      color: Colors.black.withValues(alpha: 0.08),
                     ),
-                  ),
+                  ],
                 ),
-              )
-                  .toList(),
+                child: const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 }

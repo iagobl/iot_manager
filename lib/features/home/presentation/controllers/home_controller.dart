@@ -24,6 +24,7 @@ class HomeController extends ChangeNotifier {
   final DevicesRepositoryImpl _deviceRepo;
 
   bool loading = false;
+  bool refreshing = false;
   String? errorMessage;
   HomeOverview? overview;
 
@@ -41,8 +42,15 @@ class HomeController extends ChangeNotifier {
   List<HomeSummary> get homes => overview?.homes ?? <HomeSummary>[];
   List<DeviceItem> get devices => overview?.devices ?? <DeviceItem>[];
 
-  Future<void> load() async {
-    loading = true;
+  Future<void> load({bool silent = false}) async {
+    final hasData = overview != null;
+
+    if (silent && hasData) {
+      refreshing = true;
+    } else {
+      loading = true;
+    }
+
     errorMessage = null;
     notifyListeners();
 
@@ -55,8 +63,13 @@ class HomeController extends ChangeNotifier {
       errorMessage = e.toString();
     } finally {
       loading = false;
+      refreshing = false;
       notifyListeners();
     }
+  }
+
+  Future<void> refresh() async {
+    await load(silent: true);
   }
 
   Future<void> calculateStats(HomeOverview data) async {
@@ -88,7 +101,7 @@ class HomeController extends ChangeNotifier {
 
     try {
       await homeRepo.createHome(name: name);
-      await load();
+      await load(silent: true);
       return true;
     } catch (e) {
       errorMessage = e.toString();
@@ -106,7 +119,7 @@ class HomeController extends ChangeNotifier {
 
     try {
       await homeRepo.deleteHome(homeId: homeId);
-      await load();
+      await load(silent: true);
       return true;
     } catch (e) {
       errorMessage = e.toString();

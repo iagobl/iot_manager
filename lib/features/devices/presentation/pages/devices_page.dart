@@ -20,6 +20,10 @@ class DevicesPage extends StatefulWidget {
 class DevicesPageState extends State<DevicesPage> {
   late final DevicesController controller;
 
+  Future<void> refreshFromShell() async {
+    await controller.load();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -72,7 +76,7 @@ class DevicesPageState extends State<DevicesPage> {
                 ListTile(
                   leading: const Icon(Icons.router_rounded),
                   title: const Text(DevicesStrings.configurationAp),
-                  subtitle: const Text(DevicesStrings.configurationApSubtitle),
+                  subtitle: const Text(DevicesStrings.configurationApSubtitle,),
                   onTap: () async {
                     Navigator.of(bottomSheetContext).pop();
                     await openApProvisionFlow();
