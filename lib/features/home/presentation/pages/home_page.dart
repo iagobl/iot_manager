@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'package:iot_manager/core/constants/app_strings.dart';
 import 'package:iot_manager/core/constants/auth_strings.dart';
-import 'package:iot_manager/core/constants/devices_strings.dart';
 import 'package:iot_manager/core/constants/home_strings.dart';
 import 'package:iot_manager/core/widgets/glass_card.dart';
 
 import 'package:iot_manager/features/home/presentation/controllers/home_controller.dart';
 import 'package:iot_manager/features/home/presentation/pages/home_detail_page.dart';
+import 'package:iot_manager/features/home/presentation/widgets/devices_overview_card.dart';
 import 'package:iot_manager/features/home/presentation/widgets/home_summary_card.dart';
 import 'package:iot_manager/features/home/presentation/widgets/quick_stat_card.dart';
 
@@ -89,8 +89,7 @@ class HomePageState extends State<HomePage> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          ok
+        content: Text(ok
               ? HomeStrings.confirmationCreateHome
               : (controller.errorMessage ?? HomeStrings.notConfirmationCreateHome),
         ),
@@ -206,10 +205,7 @@ class HomePageState extends State<HomePage> {
           RepaintBoundary(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final isWide = constraints.maxWidth > 700;
-                final itemWidth = isWide
-                    ? (constraints.maxWidth - 24) / 3
-                    : (constraints.maxWidth - 12) / 2;
+                final itemWidth = (constraints.maxWidth - 12) / 2;
 
                 return Wrap(
                   spacing: 12,
@@ -217,34 +213,21 @@ class HomePageState extends State<HomePage> {
                   children: [
                     SizedBox(
                       width: itemWidth,
-                      child: QuickStatCard(
-                        label: HomeStrings.homes,
-                        value: controller.totalHomes.toString(),
-                        icon: Icons.home_work_outlined,
+                      height: 160,
+                      child: DevicesOverviewCard(
+                        totalDevices: controller.totalDevices,
+                        activeDevices: controller.activeDevices,
                       ),
                     ),
                     SizedBox(
                       width: itemWidth,
-                      child: QuickStatCard(
-                        label: DevicesStrings.devices,
-                        value: controller.totalDevices.toString(),
-                        icon: Icons.devices_other_outlined,
-                      ),
-                    ),
-                    SizedBox(
-                      width: itemWidth,
-                      child: QuickStatCard(
-                        label: DevicesStrings.active,
-                        value: controller.activeDevices.toString(),
-                        icon: Icons.bolt_rounded,
-                      ),
-                    ),
-                    SizedBox(
-                      width: itemWidth,
+                      height: 160,
                       child: QuickStatCard(
                         label: HomeStrings.consumptionToday,
-                        value: '${controller.totalTodayWh.toStringAsFixed(0)} Wh',
+                        value:
+                        '${controller.totalTodayWh.toStringAsFixed(0)} Wh',
                         icon: Icons.energy_savings_leaf_outlined,
+                        valueFontSize: 24,
                       ),
                     ),
                   ],
@@ -297,8 +280,8 @@ class HomePageState extends State<HomePage> {
                     },
                     child: HomeSummaryCard(
                       name: home.name,
-                      subtitle: home.createdAt == null ? HomeStrings.createHomeRecently
-                          : 'Creado el ${home.createdAt!.day.toString().padLeft(2, '0')}/${home.createdAt!.month.toString().padLeft(2, '0')}/${home.createdAt!.year}',
+                      subtitle:
+                      '${controller.getDeviceCountForHome(home.id)} dispositivos',
                       icon: Icons.house_siding_rounded,
                       deleting: controller.deletingId == home.id,
                       onDelete: controller.deletingId != null ? null : () => confirmDeleteHome(
@@ -320,6 +303,7 @@ class HomePageState extends State<HomePage> {
 
 class SectionHeader extends StatelessWidget {
   const SectionHeader({super.key, required this.title, required this.subtitle});
+
   final String title;
   final String subtitle;
 

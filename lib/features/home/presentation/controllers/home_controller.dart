@@ -1,10 +1,11 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
 import 'package:iot_manager/features/devices/data/repositories/devices_repository_impl.dart';
+import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
 import 'package:iot_manager/features/home/data/datasources/home_remote_datasource.dart';
 import 'package:iot_manager/features/home/data/repositories/home_repository_impl.dart';
+import 'package:iot_manager/features/home/domain/entities/home_overview.dart';
+import 'package:iot_manager/features/home/domain/entities/home_summary.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HomeController extends ChangeNotifier {
@@ -24,7 +25,7 @@ class HomeController extends ChangeNotifier {
 
   bool loading = false;
   String? errorMessage;
-  dynamic overview;
+  HomeOverview? overview;
 
   String firstName = '';
 
@@ -37,9 +38,8 @@ class HomeController extends ChangeNotifier {
   bool creatingHome = false;
   String? deletingId;
 
-  List get homes => overview?.homes ?? [];
-
-  Timer? timer;
+  List<HomeSummary> get homes => overview?.homes ?? <HomeSummary>[];
+  List<DeviceItem> get devices => overview?.devices ?? <DeviceItem>[];
 
   Future<void> load() async {
     loading = true;
@@ -50,8 +50,7 @@ class HomeController extends ChangeNotifier {
       final data = await homeRepo.getOverview();
       overview = data;
       firstName = data.firstName;
-      await calculateStats();
-      startAutoRefresh();
+      await calculateStats(data);
     } catch (e) {
       errorMessage = e.toString();
     } finally {
@@ -60,33 +59,26 @@ class HomeController extends ChangeNotifier {
     }
   }
 
-  Future<void> calculateStats() async {
-    final devices = overview?.devices ?? [];
-
-    totalHomes = homes.length;
-    totalDevices = devices.length;
+  Future<void> calculateStats(HomeOverview data) async {
+    totalHomes = data.homes.length;
+    totalDevices = data.devices.length;
     activeDevices = 0;
     totalTodayWh = 0;
 
-    for (final d in devices) {
-      final isActive = await _deviceRepo.isDeviceActive(d);
-      if (isActive) {
-        activeDevices++;
-      }
+    for (final device in data.devices) {
+      totalTodayWh += device.energyTodayWh;
 
-      totalTodayWh += (d.energyTodayWh ?? 0);
+      try {
+        final isActive = await _deviceRepo.isDeviceActive(device);
+        if (isActive) {
+          activeDevices++;
+        }
+      } catch (_) {}
     }
   }
 
-  void startAutoRefresh() {
-    timer?.cancel();
-    timer = Timer.periodic(const Duration(seconds: 10), (_) async {
-      try {
-        if (overview == null) return;
-        await calculateStats();
-        notifyListeners();
-      } catch (_) {}
-    });
+  int getDeviceCountForHome(String homeId) {
+    return devices.where((device) => device.homeId == homeId).length;
   }
 
   Future<bool> createHome(String name) async {
@@ -133,11 +125,5 @@ class HomeController extends ChangeNotifier {
       errorMessage = e.toString();
       notifyListeners();
     }
-  }
-
-  @override
-  void dispose() {
-    timer?.cancel();
-    super.dispose();
   }
 }
