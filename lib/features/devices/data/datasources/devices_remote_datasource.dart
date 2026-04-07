@@ -498,7 +498,7 @@ class DevicesRemoteDatasource {
     }
   }
 
-  Future<void> createManualDevice({
+  Future<DeviceItem> createManualDevice({
     required String name,
     required String deviceType,
     required String identifier,
@@ -517,7 +517,7 @@ class DevicesRemoteDatasource {
         throw const ValidationAppException(DevicesStrings.notDeviceIdentifier);
       }
 
-      await _client.from('devices').insert({
+      final response = await _client.from('devices').insert({
         'name': name.trim(),
         'device_type': deviceType.trim(),
         'protocol': protocol.trim(),
@@ -527,7 +527,9 @@ class DevicesRemoteDatasource {
         'home_id': homeId,
         'room_id': roomId,
         'energy_today_wh': 0,
-      });
+      }).select().single();
+
+      return DeviceItem.fromMap(Map<String, dynamic>.from(response));
     } catch (error) {
       throw ErrorMapper.mapException(error);
     }

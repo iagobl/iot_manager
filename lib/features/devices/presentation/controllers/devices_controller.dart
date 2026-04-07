@@ -5,6 +5,7 @@ import 'package:iot_manager/core/error/error_mapper.dart';
 import 'package:iot_manager/core/iot/models/discovered_iot_device.dart';
 import 'package:iot_manager/core/iot/shelly/shelly_lan_discovery.dart';
 import 'package:iot_manager/core/iot/shelly/shelly_rpc_client.dart';
+import 'package:iot_manager/core/iot/shelly/shelly_telemetry_script_service.dart';
 
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
 import 'package:iot_manager/features/devices/data/repositories/devices_repository_impl.dart';
@@ -15,6 +16,7 @@ class DevicesController extends ChangeNotifier {
   DevicesController._(
       this.getUserDevices,
       this.remoteDatasource,
+      this.telemetryScriptService,
       );
 
   factory DevicesController.create() {
@@ -22,11 +24,14 @@ class DevicesController extends ChangeNotifier {
     final repository = DevicesRepositoryImpl(datasource);
     final usecase = GetUserDevices(repository);
 
-    return DevicesController._(usecase, datasource);
+    return DevicesController._(usecase, datasource,
+      const ShellyTelemetryScriptService(),
+    );
   }
 
   final GetUserDevices getUserDevices;
   final DevicesRemoteDatasource remoteDatasource;
+  final ShellyTelemetryScriptService telemetryScriptService;
 
   bool isLoading = false;
   String? errorMessages;
@@ -62,11 +67,22 @@ class DevicesController extends ChangeNotifier {
     clearError(notify: false);
 
     try {
-      await remoteDatasource.createManualDevice(
+      final createdDevice = await remoteDatasource.createManualDevice(
         name: name,
         deviceType: deviceType,
         identifier: identifier,
       );
+
+      try {
+        await telemetryScriptService.installOrUpdate(
+          host: identifier,
+          deviceId: createdDevice.id,
+        );
+      } catch (error) {
+        await remoteDatasource.deleteDevice(createdDevice.id);
+        rethrow;
+      }
+
       isDevices = await getUserDevices();
     } catch (error) {
       final failure = ErrorMapper.mapFailure(error);

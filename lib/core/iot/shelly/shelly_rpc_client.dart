@@ -201,4 +201,66 @@ class ShellyRpcClient {
   Future<void> deleteSchedule({required int id}) async {
     await call('Schedule.Delete', params: {'id': id});
   }
+
+  Future<List<Map<String, dynamic>>> listScripts() async {
+    final result = await call('Script.List');
+    final scripts = result['scripts'];
+    if (scripts is! List) return const [];
+
+    return scripts.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
+  Future<int> createScript({required String name}) async {
+    final result = await call('Script.Create', params: {'name': name});
+    final id = result['id'];
+    if (id is int) return id;
+    if (id is num) return id.toInt();
+    throw const DeviceAppException(
+      'El Shelly no devolvió un identificador válido para el script.',
+    );
+  }
+
+  Future<void> stopScript(int id) async {
+    await call('Script.Stop', params: {'id': id});
+  }
+
+  Future<void> startScript(int id) async {
+    await call('Script.Start', params: {'id': id});
+  }
+
+  Future<void> deleteScript(int id) async {
+    await call('Script.Delete', params: {'id': id});
+  }
+
+  Future<void> setScriptConfig({required int id, required bool enable}) async {
+    await call('Script.SetConfig',
+        params: {'id': id, 'config': {'enable': enable}}
+    );
+  }
+
+  Future<void> putScriptCode({
+    required int id,
+    required String code,
+    int chunkSize = 900,
+  }) async {
+    if (code.isEmpty) {
+      throw const ValidationAppException(
+        'El código del script no puede estar vacío.',
+      );
+    }
+
+    var offset = 0;
+    var append = false;
+    while (offset < code.length) {
+      final end = (offset + chunkSize) > code.length ? code.length : offset + chunkSize;
+
+      await call('Script.PutCode',
+        params: {'id': id, 'code': code.substring(offset, end), 'append': append},
+        timeout: const Duration(seconds: 8),
+      );
+
+      append = true;
+      offset = end;
+    }
+  }
 }
