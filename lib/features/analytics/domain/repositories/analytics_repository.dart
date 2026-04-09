@@ -5,5 +5,5 @@ abstract class AnalyticsRepository {
 
   Future<List<AnalyticsSample>> getSamples(AnalyticsQuery query);
 
-  Future<List<AnalyticsBreakdownItem>> getBreakdown(AnalyticsQuery query);
+  Future<AnalyticsNormalizationLimits> getDeviceNormalizationLimits(String deviceId);
 }

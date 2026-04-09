@@ -1,281 +1,357 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
 import 'package:iot_manager/features/analytics/data/datasources/analytics_remote_datasource.dart';
 import 'package:iot_manager/features/analytics/data/repositories/analytics_repository_impl.dart';
 import 'package:iot_manager/features/analytics/domain/entities/analytics_models.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 
 class AnalyticsController extends ChangeNotifier {
-  AnalyticsController() : repository = AnalyticsRepositoryImpl(AnalyticsRemoteDatasource());
+  AnalyticsController({
+    AnalyticsRepositoryImpl? repository,
+  }) : _repository = repository ?? AnalyticsRepositoryImpl(AnalyticsRemoteDatasource());
 
-  final AnalyticsRepositoryImpl repository;
+  final AnalyticsRepositoryImpl _repository;
 
-  bool loading = false;
-  bool exporting = false;
-  String? errorMessage;
+  AnalyticsState _state = AnalyticsState.initial();
+  AnalyticsState get state => _state;
 
-  List<AnalyticsScopeOption> scopes = const [];
-  AnalyticsScopeOption? selectedScope;
-  AnalyticsRangePreset selectedPreset = AnalyticsRangePreset.today;
-  DateTimeRange? customRange;
+  bool _initialized = false;
 
-  List<AnalyticsSample> samples = const [];
-  List<AnalyticsBreakdownItem> breakdown = const [];
+  Future<void> initialize() async {
+    if (_initialized) return;
+    _initialized = true;
 
-  Future<void> init() async {
-    loading = true;
-    errorMessage = null;
-    notifyListeners();
+    await _loadInitialData();
+  }
+
+  Future<void> retry() async {
+    await _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    _emit(_state.copyWith(loading: true, clearError: true));
 
     try {
-      scopes = await repository.getAvailableScopes();
-      selectedScope = scopes.isNotEmpty ? scopes.first : null;
-      await loadData();
+      final scopes = await _repository.getAvailableScopes();
+
+      AnalyticsScopeGroup selectedGroup = AnalyticsScopeGroup.global;
+
+      AnalyticsScopeOption? selectedScope;
+      final globalScopes = scopes
+          .where((scope) => scope.type == AnalyticsScopeType.allDevices || scope.type == AnalyticsScopeType.home)
+          .toList();
+      final deviceScopes =
+      scopes.where((scope) => scope.type == AnalyticsScopeType.device).toList();
+
+      if (globalScopes.isNotEmpty) {
+        selectedScope = globalScopes.first;
+        selectedGroup = AnalyticsScopeGroup.global;
+      } else if (deviceScopes.isNotEmpty) {
+        selectedScope = deviceScopes.first;
+        selectedGroup = AnalyticsScopeGroup.device;
+      }
+
+      if (selectedScope == null) {
+        _emit(
+          _state.copyWith(
+            loading: false,
+            scopes: scopes,
+            selectedScope: null,
+            selectedGroup: selectedGroup,
+            series: const AnalyticsSeries(
+              points: [],
+              totalEnergyWh: 0,
+              averagePowerW: 0,
+              averageVoltageV: 0,
+              averageCurrentA: 0,
+              maxPowerW: 0,
+              maxVoltageV: 0,
+              maxCurrentA: 0,
+              minPowerW: 0,
+              minVoltageV: 0,
+              minCurrentA: 0,
+            ),
+            summary: const AnalyticsSummary(
+              totalEnergyWh: 0,
+              averagePowerW: 0,
+              averageVoltageV: 0,
+              averageCurrentA: 0,
+              peakPowerW: 0,
+              peakVoltageV: 0,
+              peakCurrentA: 0,
+              activeDevices: 0,
+              samples: 0,
+            ),
+            normalizationLimits: AnalyticsNormalizationLimits.empty,
+          ),
+        );
+        return;
+      }
+
+      final now = DateTime.now();
+      final from = _resolveRangeStart(AnalyticsRangePreset.today, now);
+      final to = _resolveRangeEnd(AnalyticsRangePreset.today, now);
+
+      _emit(
+        _state.copyWith(
+          scopes: scopes,
+          selectedScope: selectedScope,
+          selectedGroup: selectedGroup,
+          rangePreset: AnalyticsRangePreset.today,
+          from: from,
+          to: to,
+        ),
+      );
+
+      await refresh();
     } catch (error) {
-      errorMessage = ErrorMapper.mapFailure(error).message;
-    } finally {
-      loading = false;
-      notifyListeners();
+      _emit(
+        _state.copyWith(
+          loading: false,
+          errorMessage: ErrorMapper.mapException(error).message,
+        ),
+      );
     }
   }
 
-  DateTimeRange get activeRange {
-    final now = DateTime.now();
-
-    switch (selectedPreset) {
-      case AnalyticsRangePreset.today:
-        final start = DateTime(now.year, now.month, now.day);
-        return DateTimeRange(start: start, end: now);
-
-      case AnalyticsRangePreset.last7Days:
-        final weekday = now.weekday;
-        final monday = DateTime(
-          now.year,
-          now.month,
-          now.day,
-        ).subtract(Duration(days: weekday - 1));
-        return DateTimeRange(start: monday, end: now,);
-
-      case AnalyticsRangePreset.last30Days:
-        final firstDayOfMonth = DateTime(now.year, now.month, 1);
-        return DateTimeRange(start: firstDayOfMonth, end: now);
-
-      case AnalyticsRangePreset.custom:
-        return customRange ??
-            DateTimeRange(start: DateTime(now.year, now.month, now.day), end: now);
+  Future<void> refresh() async {
+    final scope = _state.selectedScope;
+    if (scope == null) {
+      _emit(_state.copyWith(loading: false));
+      return;
     }
-  }
 
-  AnalyticsSeries get series => AnalyticsSeries.fromSamples(samples);
-
-  bool get hasData => samples.isNotEmpty;
-
-  double get currentPowerW => samples.isNotEmpty ? samples.last.powerW : 0.0;
-  double get currentVoltageV => samples.isNotEmpty ? samples.last.voltageV : 0.0;
-  double get currentCurrentA => samples.isNotEmpty ? samples.last.currentA : 0.0;
-  bool get isCurrentlyOn => currentPowerW > 0.5;
-  double get rangeConsumptionWh => calculateRangeConsumptionWh(samples);
-
-  Future<void> reload() => loadData(notify: true);
-
-  Future<void> selectScope(AnalyticsScopeOption option) async {
-    selectedScope = option;
-    notifyListeners();
-    await loadData(notify: true);
-  }
-
-  Future<void> selectPreset(AnalyticsRangePreset preset) async {
-    selectedPreset = preset;
-    notifyListeners();
-    await loadData(notify: true);
-  }
-
-  Future<void> selectCustomRange(DateTimeRange range) async {
-    customRange = range;
-    selectedPreset = AnalyticsRangePreset.custom;
-    notifyListeners();
-    await loadData(notify: true);
-  }
-
-  Future<void> loadData({bool notify = false}) async {
-    final scope = selectedScope;
-    if (scope == null) return;
-
-    if (notify) {
-      loading = true;
-      errorMessage = null;
-      notifyListeners();
-    }
+    _emit(_state.copyWith(loading: true, clearError: true));
 
     try {
       final query = AnalyticsQuery(
         scope: scope,
-        from: activeRange.start,
-        to: activeRange.end,
+        rangePreset: _state.rangePreset,
+        from: _state.from,
+        to: _state.to,
       );
 
-      samples = await repository.getSamples(query);
-      breakdown = await repository.getBreakdown(query);
-      errorMessage = null;
-    } catch (error) {
-      errorMessage = ErrorMapper.mapFailure(error).message;
-    } finally {
-      loading = false;
-      notifyListeners();
-    }
-  }
+      final samples = await _repository.getSamples(query);
+      final series = AnalyticsSeries.fromSamples(samples);
+      final summary = _repository.buildSummary(samples);
 
-  double calculateRangeConsumptionWh(List<AnalyticsSample> input) {
-    if (input.isEmpty) return 0.0;
+      AnalyticsNormalizationLimits normalizationLimits =
+          AnalyticsNormalizationLimits.empty;
 
-    final byDevice = <String, List<AnalyticsSample>>{};
-    for (final sample in input) {
-      final key = sample.deviceName;
-      byDevice.putIfAbsent(key, () => <AnalyticsSample>[]).add(sample);
-    }
-
-    double total = 0.0;
-
-    for (final entries in byDevice.values) {
-      entries.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-
-      if (entries.length < 2) continue;
-
-      for (var i = 1; i < entries.length; i++) {
-        final previous = entries[i - 1].energyWh;
-        final current = entries[i].energyWh;
-        final delta = current - previous;
-
-        if (delta.isFinite && delta > 0) {
-          total += delta;
-        }
+      if (scope.type == AnalyticsScopeType.device &&
+          scope.deviceId != null &&
+          scope.deviceId!.isNotEmpty) {
+        normalizationLimits = await _repository.getDeviceNormalizationLimits(
+          scope.deviceId!,
+        );
       }
-    }
 
-    return total;
-  }
-
-  String formatNumber(double value, {int decimals = 2}) {
-    return value.toStringAsFixed(decimals);
-  }
-
-  String formatRangeLabel() {
-    final range = activeRange;
-
-    String two(int value) => value.toString().padLeft(2, '0');
-    String date(DateTime d) => '${two(d.day)}/${two(d.month)}/${d.year}';
-    String dateTime(DateTime d) =>
-        '${date(d)} ${two(d.hour)}:${two(d.minute)}';
-
-    return '${dateTime(range.start)} · ${dateTime(range.end)}';
-  }
-
-  Future<void> exportPdf() async {
-    if (exporting) return;
-
-    try {
-      exporting = true;
-      errorMessage = null;
-      notifyListeners();
-
-      final seriesData = series;
-      final pdf = pw.Document();
-
-      const primary = PdfColor.fromInt(0xFF2563EB);
-      const border = PdfColor.fromInt(0xFFE2E8F0);
-      const bg = PdfColor.fromInt(0xFFF8FAFC);
-
-      pdf.addPage(
-        pw.MultiPage(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(24),
-          build: (context) {
-            return [
-              pw.Container(
-                padding: const pw.EdgeInsets.all(18),
-                decoration: pw.BoxDecoration(
-                  color: bg,
-                  borderRadius: pw.BorderRadius.circular(16),
-                  border: pw.Border.all(color: border),
-                ),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text('Informe analítico',
-                      style: pw.TextStyle(fontSize: 22,
-                        fontWeight: pw.FontWeight.bold, color: primary),
-                    ),
-                    pw.SizedBox(height: 8),
-                    pw.Text('Ámbito: ${selectedScope?.label ?? 'Sin selección'}'),
-                    pw.Text('Rango: ${formatRangeLabel()}'),
-                    pw.Text('Muestras analizadas: ${samples.length}'),
-                    pw.Text('Consumo del rango: ${formatNumber(rangeConsumptionWh)} Wh'),
-                  ],
-                ),
-              ),
-              pw.SizedBox(height: 16),
-              pw.Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  statBox('Consumo rango',
-                    '${formatNumber(rangeConsumptionWh)} Wh',
-                    border,
-                  ),
-                  statBox('Potencia media',
-                    '${formatNumber(seriesData.averagePowerW)} W',
-                    border,
-                  ),
-                  statBox('Voltaje medio',
-                    '${formatNumber(seriesData.averageVoltageV)} V',
-                    border,
-                  ),
-                  statBox('Corriente media',
-                    '${formatNumber(seriesData.averageCurrentA, decimals: 3)} A',
-                    border,
-                  ),
-                ],
-              ),
-            ];
-          },
+      _emit(
+        _state.copyWith(
+          loading: false,
+          series: series,
+          summary: summary,
+          normalizationLimits: normalizationLimits,
         ),
       );
-
-      await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async => pdf.save(),
-      );
     } catch (error) {
-      errorMessage = ErrorMapper.mapFailure(error).message;
-    } finally {
-      exporting = false;
-      notifyListeners();
+      _emit(
+        _state.copyWith(
+          loading: false,
+          errorMessage: ErrorMapper.mapException(error).message,
+        ),
+      );
     }
   }
 
-  pw.Widget statBox(String label, String value, PdfColor border) {
-    return pw.Container(
-      width: 124,
-      padding: const pw.EdgeInsets.all(10),
-      decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: border),
-        borderRadius: pw.BorderRadius.circular(12),
-      ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(label, style: const pw.TextStyle(fontSize: 10)),
-          pw.SizedBox(height: 6),
-          pw.Text(
-            value,
-            style: pw.TextStyle(
-              fontWeight: pw.FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-        ],
+  void selectGroup(AnalyticsScopeGroup group) {
+    if (_state.selectedGroup == group) return;
+
+    final options = scopesForGroup(group);
+    final newSelected = options.isNotEmpty ? options.first : null;
+
+    _emit(
+      _state.copyWith(
+        selectedGroup: group,
+        selectedScope: newSelected,
       ),
     );
+
+    unawaited(refresh());
+  }
+
+  void selectScope(String scopeId) {
+    final option = _state.scopes.firstWhere(
+          (scope) => scope.id == scopeId,
+      orElse: () => _state.selectedScope ?? _state.scopes.first,
+    );
+
+    if (_state.selectedScope?.id == option.id) return;
+
+    final targetGroup = option.type == AnalyticsScopeType.device
+        ? AnalyticsScopeGroup.device
+        : AnalyticsScopeGroup.global;
+
+    _emit(
+      _state.copyWith(
+        selectedGroup: targetGroup,
+        selectedScope: option,
+      ),
+    );
+
+    unawaited(refresh());
+  }
+
+  void selectRangePreset(AnalyticsRangePreset preset) {
+    final now = DateTime.now();
+    final from = _resolveRangeStart(preset, now);
+    final to = _resolveRangeEnd(preset, now);
+
+    _emit(
+      _state.copyWith(
+        rangePreset: preset,
+        from: from,
+        to: to,
+      ),
+    );
+
+    unawaited(refresh());
+  }
+
+  void setCustomRange(DateTimeRange range) {
+    final from = DateTime(
+      range.start.year,
+      range.start.month,
+      range.start.day,
+      0,
+      0,
+      0,
+    );
+    final to = DateTime(
+      range.end.year,
+      range.end.month,
+      range.end.day,
+      23,
+      59,
+      59,
+      999,
+    );
+
+    _emit(
+      _state.copyWith(
+        rangePreset: AnalyticsRangePreset.custom,
+        from: from,
+        to: to,
+      ),
+    );
+
+    unawaited(refresh());
+  }
+
+  List<AnalyticsScopeOption> scopesForGroup(AnalyticsScopeGroup group) {
+    switch (group) {
+      case AnalyticsScopeGroup.global:
+        return _state.scopes
+            .where(
+              (scope) =>
+          scope.type == AnalyticsScopeType.allDevices ||
+              scope.type == AnalyticsScopeType.home,
+        )
+            .toList();
+      case AnalyticsScopeGroup.device:
+        return _state.scopes
+            .where((scope) => scope.type == AnalyticsScopeType.device)
+            .toList();
+    }
+  }
+
+  DateTime _resolveRangeStart(AnalyticsRangePreset preset, DateTime now) {
+    switch (preset) {
+      case AnalyticsRangePreset.today:
+        return DateTime(now.year, now.month, now.day);
+      case AnalyticsRangePreset.last7Days:
+        final start = now.subtract(const Duration(days: 6));
+        return DateTime(start.year, start.month, start.day);
+      case AnalyticsRangePreset.last30Days:
+        final start = now.subtract(const Duration(days: 29));
+        return DateTime(start.year, start.month, start.day);
+      case AnalyticsRangePreset.custom:
+        return _state.from;
+    }
+  }
+
+  DateTime _resolveRangeEnd(AnalyticsRangePreset preset, DateTime now) {
+    switch (preset) {
+      case AnalyticsRangePreset.today:
+      case AnalyticsRangePreset.last7Days:
+      case AnalyticsRangePreset.last30Days:
+        return now;
+      case AnalyticsRangePreset.custom:
+        return _state.to;
+    }
+  }
+
+  String rangeLabel() {
+    switch (_state.rangePreset) {
+      case AnalyticsRangePreset.today:
+        return 'Hoy';
+      case AnalyticsRangePreset.last7Days:
+        return 'Semana actual';
+      case AnalyticsRangePreset.last30Days:
+        return 'Este mes';
+      case AnalyticsRangePreset.custom:
+        return _formatRange(_state.from, _state.to);
+    }
+  }
+
+  String scopeLabel() {
+    final scope = _state.selectedScope;
+    if (scope == null) return 'Sin ámbito';
+    return scope.label;
+  }
+
+  String _formatRange(DateTime from, DateTime to) {
+    String twoDigits(int value) => value.toString().padLeft(2, '0');
+    final fromText =
+        '${twoDigits(from.day)}/${twoDigits(from.month)}/${from.year}';
+    final toText = '${twoDigits(to.day)}/${twoDigits(to.month)}/${to.year}';
+    return '$fromText - $toText';
+  }
+
+  Future<void> exportPdf(BuildContext context) async {
+    _emit(_state.copyWith(exporting: true, clearError: true));
+
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('La exportación en PDF estará disponible próximamente.'),
+          ),
+        );
+      }
+
+      _emit(_state.copyWith(exporting: false));
+    } catch (error) {
+      _emit(
+        _state.copyWith(
+          exporting: false,
+          errorMessage: ErrorMapper.mapException(error).message,
+        ),
+      );
+    }
+  }
+
+  void clearError() {
+    if (_state.errorMessage == null) return;
+    _emit(_state.copyWith(clearError: true));
+  }
+
+  void _emit(AnalyticsState newState) {
+    _state = newState;
+    notifyListeners();
   }
 }

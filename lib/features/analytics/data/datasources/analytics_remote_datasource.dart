@@ -1,17 +1,17 @@
-import 'package:iot_manager/core/error/app_exception.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:iot_manager/core/iot/shelly/shelly_rpc_client.dart';
+import 'package:iot_manager/core/services/supabase_service.dart';
+import 'package:iot_manager/features/analytics/domain/entities/analytics_models.dart';
 
 class AnalyticsRemoteDatasource {
-  AnalyticsRemoteDatasource({SupabaseClient? client})
-      : _client = client ?? Supabase.instance.client;
+  AnalyticsRemoteDatasource();
 
-  final SupabaseClient _client;
+  final _client = SupabaseService.client;
 
   String _requireUserId() {
     final userId = _client.auth.currentUser?.id;
     if (userId == null || userId.isEmpty) {
-      throw const ValidationAppException('Debes iniciar sesión para acceder a las gráficas.');
+      throw const FormatException('No se pudo identificar al usuario actual.');
     }
     return userId;
   }
@@ -21,9 +21,8 @@ class AnalyticsRemoteDatasource {
       final userId = _requireUserId();
 
       final ownedResponse = await _client.from('devices')
-          .select('id, name, home_id, device_type, owner_id, created_at')
-          .eq('owner_id', userId)
-          .order('created_at', ascending: false);
+          .select('id, name, home_id, device_type, owner_id, identifier, created_at')
+          .eq('owner_id', userId).order('created_at', ascending: false);
 
       final owned = (ownedResponse as List)
           .map((item) => Map<String, dynamic>.from(item as Map)).toList();
@@ -41,7 +40,7 @@ class AnalyticsRemoteDatasource {
       final shared = <Map<String, dynamic>>[];
       if (sharedIds.isNotEmpty) {
         final sharedResponse = await _client.from('devices')
-            .select('id, name, home_id, device_type, owner_id, created_at')
+            .select('id, name, home_id, device_type, owner_id, identifier, created_at')
             .inFilter('id', sharedIds);
 
         shared.addAll((sharedResponse as List)
@@ -124,6 +123,45 @@ class AnalyticsRemoteDatasource {
           .toList();
     } catch (error) {
       throw ErrorMapper.mapException(error);
+    }
+  }
+
+  Future<AnalyticsNormalizationLimits> getDeviceNormalizationLimits(
+      String deviceId,
+      ) async {
+    try {
+      final response = await _client
+          .from('devices')
+          .select('identifier')
+          .eq('id', deviceId)
+          .maybeSingle();
+
+      if (response == null) {
+        return AnalyticsNormalizationLimits.empty;
+      }
+
+      final row = Map<String, dynamic>.from(response as Map);
+      final host = (row['identifier'] ?? '').toString().trim();
+      if (host.isEmpty) {
+        return AnalyticsNormalizationLimits.empty;
+      }
+
+      final rpc = ShellyRpcClient(host: host);
+      final config = await rpc.call('Switch.GetConfig', params: {'id': 0});
+
+      double toDouble(Object? value) {
+        if (value is num) return value.toDouble();
+        return double.tryParse((value ?? '').toString().replaceAll(',', '.')) ?? 0;
+      }
+
+      return AnalyticsNormalizationLimits(
+        powerW: toDouble(config['power_limit']),
+        voltageV: toDouble(config['voltage_limit']),
+        currentA: toDouble(config['current_limit']),
+        usesDeviceLimits: true,
+      );
+    } catch (_) {
+      return AnalyticsNormalizationLimits.empty;
     }
   }
 }

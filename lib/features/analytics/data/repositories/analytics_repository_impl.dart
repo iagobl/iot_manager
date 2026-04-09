@@ -14,18 +14,12 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
     final homes = await _remoteDatasource.getAccessibleHomes();
     final devices = await _remoteDatasource.getAccessibleDevices();
 
-    final options = <AnalyticsScopeOption>[
-      const AnalyticsScopeOption(
-        id: 'all_devices',
-        label: 'Todos los dispositivos',
-        subtitle: 'Vista global de toda la instalación',
-        type: AnalyticsScopeType.allDevices,
-      ),
-    ];
+    final options = <AnalyticsScopeOption>[];
 
     for (final home in homes) {
       final id = (home['id'] ?? '').toString();
       if (id.isEmpty) continue;
+
       options.add(
         AnalyticsScopeOption(
           id: 'home_$id',
@@ -112,70 +106,74 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
         timestamp: DateTime.tryParse((row['ts'] ?? '').toString())?.toLocal() ?? DateTime.now(),
         powerW: readDouble(row['power_w']),
         voltageV: readDouble(row['voltage_v']),
-        currentA: readDouble(row['current_a'] ?? meta['current_a'] ?? meta['current'] ?? meta['amps'] ?? meta['apower_current']),
-        energyWh: readDouble(row['energy_wh']),
+        currentA: readDouble(row['current_a']),
+        energyWh: readDouble(row['energy_wh']) != 0
+            ? readDouble(row['energy_wh'])
+            : readDouble(meta['energy_wh']),
       );
     }).toList();
   }
 
   @override
-  Future<List<AnalyticsBreakdownItem>> getBreakdown(AnalyticsQuery query) async {
-    final samples = await getSamples(query);
-    final grouped = <String, List<AnalyticsSample>>{};
-    final labels = <String, String>{};
-    final types = <String, AnalyticsScopeType>{};
+  Future<AnalyticsNormalizationLimits> getDeviceNormalizationLimits(
+      String deviceId,
+      ) {
+    return _remoteDatasource.getDeviceNormalizationLimits(deviceId);
+  }
 
-    for (final sample in samples) {
-      late final String key;
-      late final String label;
-      late final AnalyticsScopeType type;
-
-      if (query.scope.type == AnalyticsScopeType.home) {
-        key = sample.deviceId;
-        label = sample.deviceName;
-        type = AnalyticsScopeType.device;
-      } else if (query.scope.type == AnalyticsScopeType.device) {
-        key = sample.deviceId;
-        label = sample.deviceName;
-        type = AnalyticsScopeType.device;
-      } else {
-        key = sample.homeId ?? 'without_home';
-        label = sample.homeName ?? 'Sin hogar';
-        type = AnalyticsScopeType.home;
-      }
-
-      grouped.putIfAbsent(key, () => <AnalyticsSample>[]).add(sample);
-      labels[key] = label;
-      types[key] = type;
+  AnalyticsSummary buildSummary(List<AnalyticsSample> samples) {
+    if (samples.isEmpty) {
+      return const AnalyticsSummary(
+        totalEnergyWh: 0,
+        averagePowerW: 0,
+        averageVoltageV: 0,
+        averageCurrentA: 0,
+        peakPowerW: 0,
+        peakVoltageV: 0,
+        peakCurrentA: 0,
+        activeDevices: 0,
+        samples: 0,
+      );
     }
 
-    final items = grouped.entries.map((entry) {
-      final bucket = entry.value;
-      final count = math.max(bucket.length, 1);
-      double energy = 0;
-      double power = 0;
-      double voltage = 0;
-      double current = 0;
+    final totalEnergyWh =
+    samples.fold<double>(0, (sum, item) => sum + item.energyWh);
+    final averagePowerW =
+        samples.fold<double>(0, (sum, item) => sum + item.powerW) /
+            samples.length;
+    final averageVoltageV =
+        samples.fold<double>(0, (sum, item) => sum + item.voltageV) /
+            samples.length;
+    final averageCurrentA =
+        samples.fold<double>(0, (sum, item) => sum + item.currentA) /
+            samples.length;
 
-      for (final sample in bucket) {
-        energy += sample.energyWh;
-        power += sample.powerW;
-        voltage += sample.voltageV;
-        current += sample.currentA;
-      }
+    final peakPowerW = samples
+        .map((sample) => sample.powerW)
+        .fold<double>(0, (max, value) => math.max(max, value));
+    final peakVoltageV = samples
+        .map((sample) => sample.voltageV)
+        .fold<double>(0, (max, value) => math.max(max, value));
+    final peakCurrentA = samples
+        .map((sample) => sample.currentA)
+        .fold<double>(0, (max, value) => math.max(max, value));
 
-      return AnalyticsBreakdownItem(
-        id: entry.key,
-        label: labels[entry.key] ?? 'Elemento',
-        scopeType: types[entry.key] ?? AnalyticsScopeType.device,
-        totalEnergyWh: energy,
-        averagePowerW: power / count,
-        averageVoltageV: voltage / count,
-        averageCurrentA: current / count,
-        samples: bucket.length,
-      );
-    }).toList()..sort((a, b) => b.totalEnergyWh.compareTo(a.totalEnergyWh));
+    final activeDevices = samples
+        .where((sample) => sample.powerW > 0)
+        .map((sample) => sample.deviceId)
+        .toSet()
+        .length;
 
-    return items;
+    return AnalyticsSummary(
+      totalEnergyWh: totalEnergyWh,
+      averagePowerW: averagePowerW,
+      averageVoltageV: averageVoltageV,
+      averageCurrentA: averageCurrentA,
+      peakPowerW: peakPowerW,
+      peakVoltageV: peakVoltageV,
+      peakCurrentA: peakCurrentA,
+      activeDevices: activeDevices,
+      samples: samples.length,
+    );
   }
 }

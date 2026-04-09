@@ -18,6 +18,8 @@ class AnalyticsChart extends StatelessWidget {
     required this.mode,
     required this.showTodayModeSelector,
     required this.onModeChanged,
+    this.normalizationLimits = AnalyticsNormalizationLimits.empty,
+    this.aggregateMode = false,
   });
 
   final AnalyticsSeries series;
@@ -25,6 +27,8 @@ class AnalyticsChart extends StatelessWidget {
   final AnalyticsChartMode mode;
   final bool showTodayModeSelector;
   final ValueChanged<AnalyticsChartMode> onModeChanged;
+  final AnalyticsNormalizationLimits normalizationLimits;
+  final bool aggregateMode;
 
   @override
   Widget build(BuildContext context) {
@@ -51,14 +55,15 @@ class AnalyticsChart extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _titleForMode(mode),
+            aggregateMode ? _aggregateTitleForMode(mode) : _titleForMode(mode),
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            _descriptionForMode(mode),
+            aggregateMode ? _aggregateDescriptionForMode(mode)
+                : _descriptionForMode(mode),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: scheme.onSurfaceVariant,
             ),
@@ -83,7 +88,7 @@ class AnalyticsChart extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 14),
-          const _LegendRow(),
+          if (aggregateMode) const _AggregateLegendRow() else const _LegendRow(),
           const SizedBox(height: 18),
           Container(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
@@ -98,7 +103,7 @@ class AnalyticsChart extends StatelessWidget {
               height: 320,
               width: double.infinity,
               child: CustomPaint(
-                painter: _GroupedHistogramPainter(
+                painter: aggregateMode ? _AggregateLinePainter(
                   buckets: buckets,
                   textStyle:
                   Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -108,6 +113,18 @@ class AnalyticsChart extends StatelessWidget {
                       const TextStyle(fontSize: 11),
                   gridColor: scheme.outlineVariant.withOpacity(0.34),
                   mode: mode,
+                )
+                    : _GroupedHistogramPainter(
+                  buckets: buckets,
+                  textStyle:
+                  Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ) ??
+                      const TextStyle(fontSize: 11),
+                  gridColor: scheme.outlineVariant.withOpacity(0.34),
+                  mode: mode,
+                  normalizationLimits: normalizationLimits,
                 ),
               ),
             ),
@@ -135,11 +152,37 @@ class AnalyticsChart extends StatelessWidget {
       case AnalyticsChartMode.todayBands:
         return 'Agrupación del día actual por bloques horarios.';
       case AnalyticsChartMode.currentMoment:
-        return 'Seguimiento de las últimas 4 horas en intervalos de 15 minutos.';
+        return 'Seguimiento de las últimas 4 horas en intervalos de 20 minutos.';
       case AnalyticsChartMode.weekDays:
         return 'Media diaria de la semana actual.';
       case AnalyticsChartMode.rangePeriods:
         return 'Media por periodos temporales del rango seleccionado.';
+    }
+  }
+
+  String _aggregateTitleForMode(AnalyticsChartMode mode) {
+    switch (mode) {
+      case AnalyticsChartMode.todayBands:
+        return 'Consumo por franjas horarias';
+      case AnalyticsChartMode.currentMoment:
+        return 'Consumo del momento actual';
+      case AnalyticsChartMode.weekDays:
+        return 'Consumo de la semana actual';
+      case AnalyticsChartMode.rangePeriods:
+        return 'Consumo por periodos del rango';
+    }
+  }
+
+  String _aggregateDescriptionForMode(AnalyticsChartMode mode) {
+    switch (mode) {
+      case AnalyticsChartMode.todayBands:
+        return 'Seguimiento del consumo agrupado por franjas del día.';
+      case AnalyticsChartMode.currentMoment:
+        return 'Seguimiento del consumo agrupado en intervalos recientes.';
+      case AnalyticsChartMode.weekDays:
+        return 'Evolución del consumo diario de la semana actual.';
+      case AnalyticsChartMode.rangePeriods:
+        return 'Evolución del consumo total por periodos del rango seleccionado.';
     }
   }
 
@@ -171,6 +214,7 @@ class AnalyticsChart extends StatelessWidget {
     final powerSums = List<double>.filled(6, 0.0);
     final voltageSums = List<double>.filled(6, 0.0);
     final currentSums = List<double>.filled(6, 0.0);
+    final energySums = List<double>.filled(6, 0.0);
     final counts = List<int>.filled(6, 0);
 
     for (final point in points) {
@@ -179,6 +223,7 @@ class AnalyticsChart extends StatelessWidget {
       powerSums[bucket] += point.powerW;
       voltageSums[bucket] += point.voltageV;
       currentSums[bucket] += point.currentA;
+      energySums[bucket] += point.energyWh;
       counts[bucket] += 1;
     }
 
@@ -189,6 +234,7 @@ class AnalyticsChart extends StatelessWidget {
         power: count == 0 ? 0.0 : powerSums[index] / count,
         voltage: count == 0 ? 0.0 : voltageSums[index] / count,
         current: count == 0 ? 0.0 : currentSums[index] / count,
+        energy: energySums[index],
       );
     });
   }
@@ -196,7 +242,11 @@ class AnalyticsChart extends StatelessWidget {
   List<_GroupedBucket> _buildCurrentMoment(List<AnalyticsPoint> points) {
     final latestLocal = points.last.timestamp.toLocal();
 
-    final alignedMinute = (latestLocal.minute ~/ 15) * 15;
+    const intervalMinutes = 20;
+    const totalBuckets = 12;
+
+    final alignedMinute = (latestLocal.minute ~/ intervalMinutes) * intervalMinutes;
+
     final alignedEnd = DateTime(
       latestLocal.year,
       latestLocal.month,
@@ -205,35 +255,36 @@ class AnalyticsChart extends StatelessWidget {
       alignedMinute,
     );
 
-    // 16 bloques de 15 minutos = 4 horas exactas
-    final start = alignedEnd.subtract(const Duration(hours: 3, minutes: 45));
+    final start = alignedEnd.subtract(const Duration(minutes: 220));
 
-    final powerSums = List<double>.filled(16, 0.0);
-    final voltageSums = List<double>.filled(16, 0.0);
-    final currentSums = List<double>.filled(16, 0.0);
-    final counts = List<int>.filled(16, 0);
+    final powerSums = List<double>.filled(totalBuckets, 0.0);
+    final voltageSums = List<double>.filled(totalBuckets, 0.0);
+    final currentSums = List<double>.filled(totalBuckets, 0.0);
+    final energySums = List<double>.filled(totalBuckets, 0.0);
+    final counts = List<int>.filled(totalBuckets, 0);
 
     for (final point in points) {
       final local = point.timestamp.toLocal();
 
       if (local.isBefore(start) ||
-          local.isAfter(alignedEnd.add(const Duration(minutes: 14, seconds: 59)))) {
+          local.isAfter(alignedEnd.add(const Duration(minutes: 19, seconds: 59)))) {
         continue;
       }
 
       final diffMinutes = local.difference(start).inMinutes;
-      final bucket = diffMinutes ~/ 15;
+      final bucket = diffMinutes ~/ intervalMinutes;
 
-      if (bucket >= 0 && bucket < 16) {
+      if (bucket >= 0 && bucket < totalBuckets) {
         powerSums[bucket] += point.powerW;
         voltageSums[bucket] += point.voltageV;
         currentSums[bucket] += point.currentA;
+        energySums[bucket] += point.energyWh;
         counts[bucket] += 1;
       }
     }
 
-    return List.generate(16, (index) {
-      final slotTime = start.add(Duration(minutes: index * 15));
+    return List.generate(totalBuckets, (index) {
+      final slotTime = start.add(Duration(minutes: index * intervalMinutes));
       final label =
           '${slotTime.hour.toString().padLeft(2, '0')}:${slotTime.minute.toString().padLeft(2, '0')}';
       final count = counts[index];
@@ -243,25 +294,28 @@ class AnalyticsChart extends StatelessWidget {
         power: count == 0 ? 0.0 : powerSums[index] / count,
         voltage: count == 0 ? 0.0 : voltageSums[index] / count,
         current: count == 0 ? 0.0 : currentSums[index] / count,
+        energy: energySums[index],
       );
     });
   }
 
   List<_GroupedBucket> _buildWeekDays(List<AnalyticsPoint> points) {
-    const labels = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+    const labels = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
     final powerSums = List<double>.filled(7, 0.0);
     final voltageSums = List<double>.filled(7, 0.0);
     final currentSums = List<double>.filled(7, 0.0);
+    final energySums = List<double>.filled(7, 0.0);
     final counts = List<int>.filled(7, 0);
 
     for (final point in points) {
       final local = point.timestamp.toLocal();
-      final bucket = local.weekday - 1;
-      powerSums[bucket] += point.powerW;
-      voltageSums[bucket] += point.voltageV;
-      currentSums[bucket] += point.currentA;
-      counts[bucket] += 1;
+      final weekdayIndex = local.weekday - 1;
+      powerSums[weekdayIndex] += point.powerW;
+      voltageSums[weekdayIndex] += point.voltageV;
+      currentSums[weekdayIndex] += point.currentA;
+      energySums[weekdayIndex] += point.energyWh;
+      counts[weekdayIndex] += 1;
     }
 
     return List.generate(7, (index) {
@@ -271,6 +325,7 @@ class AnalyticsChart extends StatelessWidget {
         power: count == 0 ? 0.0 : powerSums[index] / count,
         voltage: count == 0 ? 0.0 : voltageSums[index] / count,
         current: count == 0 ? 0.0 : currentSums[index] / count,
+        energy: energySums[index],
       );
     });
   }
@@ -280,81 +335,53 @@ class AnalyticsChart extends StatelessWidget {
       DateTimeRange range,
       ) {
     final totalDays = range.end.difference(range.start).inDays + 1;
+    final desiredBuckets = totalDays <= 10 ? totalDays : 10;
+    final bucketCount = math.max(1, desiredBuckets);
 
-    if (totalDays <= 10) {
-      final dayBuckets = <DateTime, List<AnalyticsPoint>>{};
-      for (final point in points) {
-        final local = point.timestamp.toLocal();
-        final day = DateTime(local.year, local.month, local.day);
-        dayBuckets.putIfAbsent(day, () => <AnalyticsPoint>[]).add(point);
-      }
+    final powerSums = List<double>.filled(bucketCount, 0.0);
+    final voltageSums = List<double>.filled(bucketCount, 0.0);
+    final currentSums = List<double>.filled(bucketCount, 0.0);
+    final energySums = List<double>.filled(bucketCount, 0.0);
+    final counts = List<int>.filled(bucketCount, 0);
 
-      final orderedDays = dayBuckets.keys.toList()..sort();
-      return orderedDays.map((day) {
-        final entries = dayBuckets[day]!;
-        return _GroupedBucket(
-          label:
-          '${day.day.toString().padLeft(2, '0')}/${day.month.toString().padLeft(2, '0')}',
-          power: _avg(entries.map((e) => e.powerW)),
-          voltage: _avg(entries.map((e) => e.voltageV)),
-          current: _avg(entries.map((e) => e.currentA)),
-        );
-      }).toList();
-    }
-
-    final periodSize = totalDays <= 31 ? 7 : (totalDays / 4).ceil();
-    final buckets = <_GroupedBucket>[];
-
-    var periodStart = DateTime(
-      range.start.year,
-      range.start.month,
-      range.start.day,
+    final totalMillis = math.max(
+      1,
+      range.end.millisecondsSinceEpoch - range.start.millisecondsSinceEpoch,
     );
 
-    while (!periodStart.isAfter(range.end)) {
-      final tentativeEnd = periodStart.add(Duration(days: periodSize - 1));
-      final periodEnd = tentativeEnd.isAfter(range.end) ? range.end : tentativeEnd;
-
-      final entries = points.where((point) {
-        final local = point.timestamp.toLocal();
-        return !local.isBefore(periodStart) &&
-            !local.isAfter(
-              DateTime(
-                periodEnd.year,
-                periodEnd.month,
-                periodEnd.day,
-                23,
-                59,
-                59,
-              ),
-            );
-      }).toList();
-
-      buckets.add(
-        _GroupedBucket(
-          label:
-          '${periodStart.day.toString().padLeft(2, '0')}-${periodEnd.day.toString().padLeft(2, '0')}',
-          power: _avg(entries.map((e) => e.powerW)),
-          voltage: _avg(entries.map((e) => e.voltageV)),
-          current: _avg(entries.map((e) => e.currentA)),
-        ),
+    for (final point in points) {
+      final clampedMillis = point.timestamp.millisecondsSinceEpoch.clamp(
+        range.start.millisecondsSinceEpoch,
+        range.end.millisecondsSinceEpoch,
       );
+      final ratio = (clampedMillis - range.start.millisecondsSinceEpoch) / totalMillis;
+      final bucket = math.min(bucketCount - 1, (ratio * bucketCount).floor());
 
-      periodStart = DateTime(
-        periodEnd.year,
-        periodEnd.month,
-        periodEnd.day,
-      ).add(const Duration(days: 1));
+      powerSums[bucket] += point.powerW;
+      voltageSums[bucket] += point.voltageV;
+      currentSums[bucket] += point.currentA;
+      energySums[bucket] += point.energyWh;
+      counts[bucket] += 1;
     }
 
-    return buckets;
-  }
+    return List.generate(bucketCount, (index) {
+      final sliceStart = range.start.add(
+        Duration(
+          milliseconds: ((totalMillis / bucketCount) * index).round(),
+        ),
+      );
+      final label =
+          '${sliceStart.day.toString().padLeft(2, '0')}/${sliceStart.month.toString().padLeft(2, '0')}';
 
-  double _avg(Iterable<double> values) {
-    final list = values.toList();
-    if (list.isEmpty) return 0.0;
-    final sum = list.fold<double>(0.0, (acc, item) => acc + item);
-    return sum / list.length;
+      final count = counts[index];
+      return _GroupedBucket(
+        label: label,
+        power: count == 0 ? 0.0 : powerSums[index] / count,
+        voltage: count == 0 ? 0.0 : voltageSums[index] / count,
+        current: count == 0 ? 0.0 : currentSums[index] / count,
+        energy: energySums[index],
+      );
+    });
   }
 }
 
@@ -364,12 +391,477 @@ class _GroupedBucket {
     required this.power,
     required this.voltage,
     required this.current,
+    required this.energy,
   });
 
   final String label;
   final double power;
   final double voltage;
   final double current;
+  final double energy;
+}
+
+class _GroupedHistogramPainter extends CustomPainter {
+  _GroupedHistogramPainter({
+    required this.buckets,
+    required this.textStyle,
+    required this.gridColor,
+    required this.mode,
+    required this.normalizationLimits,
+  });
+
+  final List<_GroupedBucket> buckets;
+  final TextStyle textStyle;
+  final Color gridColor;
+  final AnalyticsChartMode mode;
+  final AnalyticsNormalizationLimits normalizationLimits;
+
+  static const _powerColor = Color(0xFF2563EB);
+  static const _voltageColor = Color(0xFF7C3AED);
+  static const _currentColor = Color(0xFF14B8A6);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final leftPadding = 46.0;
+    final rightPadding = 12.0;
+    final topPadding = 12.0;
+    final bottomPadding = 34.0;
+
+    final chartRect = Rect.fromLTWH(
+      leftPadding,
+      topPadding,
+      size.width - leftPadding - rightPadding,
+      size.height - topPadding - bottomPadding,
+    );
+
+    final yTicks = const [0.0, 0.25, 0.5, 0.75, 1.0];
+
+    final gridPaint = Paint()
+      ..color = gridColor
+      ..strokeWidth = 1;
+
+    for (final tick in yTicks) {
+      final y = chartRect.bottom - (chartRect.height * tick);
+      canvas.drawLine(
+        Offset(chartRect.left, y),
+        Offset(chartRect.right, y),
+        gridPaint,
+      );
+
+      final label = '${(tick * 100).round()}%';
+      final tp = TextPainter(
+        text: TextSpan(text: label, style: textStyle),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      tp.paint(canvas, Offset(0, y - (tp.height / 2)));
+    }
+
+    final axisPaint = Paint()
+      ..color = gridColor.withOpacity(0.9)
+      ..strokeWidth = 1.2;
+
+    canvas.drawLine(
+      Offset(chartRect.left, chartRect.bottom),
+      Offset(chartRect.right, chartRect.bottom),
+      axisPaint,
+    );
+
+    if (buckets.isEmpty) {
+      final tp = TextPainter(
+        text: TextSpan(
+          text: 'No hay datos para este periodo',
+          style: textStyle.copyWith(fontSize: 12),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: size.width);
+
+      tp.paint(
+        canvas,
+        Offset(
+          (size.width - tp.width) / 2,
+          (size.height - tp.height) / 2,
+        ),
+      );
+      return;
+    }
+
+    final maxPower = buckets.fold<double>(0, (max, item) => math.max(max, item.power));
+    final maxVoltage =
+    buckets.fold<double>(0, (max, item) => math.max(max, item.voltage));
+    final maxCurrent =
+    buckets.fold<double>(0, (max, item) => math.max(max, item.current));
+
+    final normalizationPower =
+    normalizationLimits.powerW > 0 ? normalizationLimits.powerW : maxPower;
+    final normalizationVoltage =
+    normalizationLimits.voltageV > 0 ? normalizationLimits.voltageV : maxVoltage;
+    final normalizationCurrent =
+    normalizationLimits.currentA > 0 ? normalizationLimits.currentA : maxCurrent;
+
+    final bucketWidth = chartRect.width / buckets.length;
+    final groupWidth = bucketWidth * 0.60;
+    final barWidth = groupWidth / 3;
+
+    final powerPaint = Paint()..color = _powerColor;
+    final voltagePaint = Paint()..color = _voltageColor;
+    final currentPaint = Paint()..color = _currentColor;
+
+    for (int i = 0; i < buckets.length; i++) {
+      final bucket = buckets[i];
+      final baseX = chartRect.left + (bucketWidth * i) + ((bucketWidth - groupWidth) / 2);
+
+      final powerRatio = _normalizedRatio(bucket.power, normalizationPower);
+      final voltageRatio = _normalizedRatio(bucket.voltage, normalizationVoltage);
+      final currentRatio = _normalizedRatio(bucket.current, normalizationCurrent);
+
+      _drawBar(
+        canvas: canvas,
+        rect: Rect.fromLTWH(
+          baseX,
+          chartRect.bottom - (chartRect.height * powerRatio),
+          barWidth,
+          chartRect.height * powerRatio,
+        ),
+        paint: powerPaint,
+      );
+
+      _drawBar(
+        canvas: canvas,
+        rect: Rect.fromLTWH(
+          baseX + barWidth,
+          chartRect.bottom - (chartRect.height * voltageRatio),
+          barWidth,
+          chartRect.height * voltageRatio,
+        ),
+        paint: voltagePaint,
+      );
+
+      _drawBar(
+        canvas: canvas,
+        rect: Rect.fromLTWH(
+          baseX + (barWidth * 2),
+          chartRect.bottom - (chartRect.height * currentRatio),
+          barWidth,
+          chartRect.height * currentRatio,
+        ),
+        paint: currentPaint,
+      );
+
+      final shouldPaintLabel = _shouldPaintLabel(i, buckets.length, mode);
+      if (shouldPaintLabel) {
+        final tp = TextPainter(
+          text: TextSpan(text: bucket.label, style: textStyle),
+          textDirection: TextDirection.ltr,
+          textAlign: TextAlign.center,
+        )..layout(minWidth: bucketWidth, maxWidth: bucketWidth);
+
+        tp.paint(
+          canvas,
+          Offset(
+            chartRect.left + (bucketWidth * i),
+            chartRect.bottom + 8,
+          ),
+        );
+      }
+    }
+  }
+
+  double _normalizedRatio(double value, double maxValue) {
+    if (maxValue <= 0) return 0;
+    final ratio = value / maxValue;
+    return ratio.clamp(0.0, 1.0);
+  }
+
+  bool _shouldPaintLabel(int index, int total, AnalyticsChartMode mode) {
+    switch (mode) {
+      case AnalyticsChartMode.currentMoment:
+        return index % 3 == 0 || index == total - 1;
+      case AnalyticsChartMode.todayBands:
+        return true;
+      case AnalyticsChartMode.weekDays:
+        return true;
+      case AnalyticsChartMode.rangePeriods:
+        if (total <= 6) return true;
+        return index % 2 == 0 || index == total - 1;
+    }
+  }
+
+  void _drawBar({
+    required Canvas canvas,
+    required Rect rect,
+    required Paint paint,
+  }) {
+    if (rect.height <= 0) return;
+
+    final rrect = RRect.fromRectAndRadius(
+      rect,
+      const Radius.circular(3),
+    );
+    canvas.drawRRect(rrect, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _GroupedHistogramPainter oldDelegate) {
+    return oldDelegate.buckets != buckets ||
+        oldDelegate.textStyle != textStyle ||
+        oldDelegate.gridColor != gridColor ||
+        oldDelegate.mode != mode ||
+        oldDelegate.normalizationLimits != normalizationLimits;
+  }
+}
+
+class _AggregateLinePainter extends CustomPainter {
+  _AggregateLinePainter({
+    required this.buckets,
+    required this.textStyle,
+    required this.gridColor,
+    required this.mode,
+  });
+
+  final List<_GroupedBucket> buckets;
+  final TextStyle textStyle;
+  final Color gridColor;
+  final AnalyticsChartMode mode;
+
+  static const _lineColor = Color(0xFF2563EB);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final leftPadding = 46.0;
+    final rightPadding = 12.0;
+    final topPadding = 12.0;
+    final bottomPadding = 34.0;
+
+    final chartRect = Rect.fromLTWH(
+      leftPadding,
+      topPadding,
+      size.width - leftPadding - rightPadding,
+      size.height - topPadding - bottomPadding,
+    );
+
+    if (buckets.isEmpty) {
+      final tp = TextPainter(
+        text: TextSpan(
+          text: 'No hay datos para este periodo',
+          style: textStyle.copyWith(fontSize: 12),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: size.width);
+
+      tp.paint(
+        canvas,
+        Offset(
+          (size.width - tp.width) / 2,
+          (size.height - tp.height) / 2,
+        ),
+      );
+      return;
+    }
+
+    final values = buckets.map((e) => e.energy).toList();
+    final maxValue = values.fold<double>(0, math.max);
+    final minValue = values.fold<double>(double.infinity, math.min);
+    final safeMinValue = minValue == double.infinity ? 0.0 : minValue;
+    final valueRange = (maxValue - safeMinValue).abs() < 0.0001
+        ? math.max(1.0, maxValue)
+        : (maxValue - safeMinValue);
+
+    final gridPaint = Paint()
+      ..color = gridColor
+      ..strokeWidth = 1;
+
+    const gridLines = 5;
+    for (int i = 0; i < gridLines; i++) {
+      final ratio = i / (gridLines - 1);
+      final y = chartRect.bottom - (chartRect.height * ratio);
+      canvas.drawLine(
+        Offset(chartRect.left, y),
+        Offset(chartRect.right, y),
+        gridPaint,
+      );
+
+      final value = safeMinValue + (valueRange * ratio);
+      final label = value >= 100
+          ? value.toStringAsFixed(0)
+          : value.toStringAsFixed(2);
+
+      final tp = TextPainter(
+        text: TextSpan(text: label, style: textStyle),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      tp.paint(canvas, Offset(0, y - (tp.height / 2)));
+    }
+
+    final axisPaint = Paint()
+      ..color = gridColor.withOpacity(0.9)
+      ..strokeWidth = 1.2;
+
+    canvas.drawLine(
+      Offset(chartRect.left, chartRect.bottom),
+      Offset(chartRect.right, chartRect.bottom),
+      axisPaint,
+    );
+
+    final pointSpacing =
+    buckets.length == 1 ? 0.0 : chartRect.width / (buckets.length - 1);
+
+    final linePaint = Paint()
+      ..color = _lineColor
+      ..strokeWidth = 2.2
+      ..style = PaintingStyle.stroke;
+
+    final pointPaint = Paint()
+      ..color = _lineColor
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    final points = <Offset>[];
+
+    for (int i = 0; i < buckets.length; i++) {
+      final value = buckets[i].energy;
+      final normalized = ((value - safeMinValue) / valueRange).clamp(0.0, 1.0);
+      final x = chartRect.left + (pointSpacing * i);
+      final y = chartRect.bottom - (chartRect.height * normalized);
+      final offset = Offset(x, y);
+      points.add(offset);
+
+      if (i == 0) {
+        path.moveTo(offset.dx, offset.dy);
+      } else {
+        path.lineTo(offset.dx, offset.dy);
+      }
+    }
+
+    canvas.drawPath(path, linePaint);
+
+    for (final point in points) {
+      canvas.drawCircle(point, 3.5, pointPaint);
+      canvas.drawCircle(
+        point,
+        5.5,
+        Paint()
+          ..color = _lineColor.withOpacity(0.16)
+          ..style = PaintingStyle.fill,
+      );
+    }
+
+    for (int i = 0; i < buckets.length; i++) {
+      final shouldPaintLabel = _shouldPaintLabel(i, buckets.length, mode);
+      if (!shouldPaintLabel) continue;
+
+      final label = buckets[i].label;
+      final tp = TextPainter(
+        text: TextSpan(text: label, style: textStyle),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      )..layout(minWidth: 48, maxWidth: 48);
+
+      final dx = (points[i].dx - 24).clamp(chartRect.left, chartRect.right - 48);
+      tp.paint(canvas, Offset(dx, chartRect.bottom + 8));
+    }
+  }
+
+  bool _shouldPaintLabel(int index, int total, AnalyticsChartMode mode) {
+    switch (mode) {
+      case AnalyticsChartMode.currentMoment:
+        return index % 3 == 0 || index == total - 1;
+      case AnalyticsChartMode.todayBands:
+        return true;
+      case AnalyticsChartMode.weekDays:
+        return true;
+      case AnalyticsChartMode.rangePeriods:
+        if (total <= 6) return true;
+        return index % 2 == 0 || index == total - 1;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AggregateLinePainter oldDelegate) {
+    return oldDelegate.buckets != buckets ||
+        oldDelegate.textStyle != textStyle ||
+        oldDelegate.gridColor != gridColor ||
+        oldDelegate.mode != mode;
+  }
+}
+
+class _LegendRow extends StatelessWidget {
+  const _LegendRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      children: [
+        _LegendChip(
+          color: Color(0xFF2563EB),
+          label: 'Potencia',
+        ),
+        _LegendChip(
+          color: Color(0xFF7C3AED),
+          label: 'Voltaje',
+        ),
+        _LegendChip(
+          color: Color(0xFF14B8A6),
+          label: 'Corriente',
+        ),
+      ],
+    );
+  }
+}
+
+class _AggregateLegendRow extends StatelessWidget {
+  const _AggregateLegendRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      children: [
+        _LegendChip(
+          color: Color(0xFF2563EB),
+          label: 'Consumo',
+        ),
+      ],
+    );
+  }
+}
+
+class _LegendChip extends StatelessWidget {
+  const _LegendChip({
+    required this.color,
+    required this.label,
+  });
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _ModeChip extends StatelessWidget {
@@ -387,275 +879,31 @@ class _ModeChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onTap(),
-      selectedColor: scheme.primary.withOpacity(0.12),
-      side: BorderSide(
-        color: selected
-            ? scheme.primary.withOpacity(0.30)
-            : scheme.outlineVariant.withOpacity(0.70),
-      ),
-      labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-        fontWeight: FontWeight.w700,
-      ),
-    );
-  }
-}
-
-class _LegendRow extends StatelessWidget {
-  const _LegendRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 14,
-      runSpacing: 8,
-      children: const [
-        _LegendItem(color: Color(0xFF2563EB), label: 'Potencia'),
-        _LegendItem(color: Color(0xFF8B5CF6), label: 'Voltaje'),
-        _LegendItem(color: Color(0xFF14B8A6), label: 'Corriente'),
-      ],
-    );
-  }
-}
-
-class _LegendItem extends StatelessWidget {
-  const _LegendItem({
-    required this.color,
-    required this.label,
-  });
-
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelLarge?.copyWith(
-      fontWeight: FontWeight.w700,
-    );
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? scheme.primary.withOpacity(0.12)
+              : scheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected
+                ? scheme.primary.withOpacity(0.55)
+                : scheme.outlineVariant.withOpacity(0.6),
           ),
         ),
-        const SizedBox(width: 8),
-        Text(label, style: style),
-      ],
-    );
-  }
-}
-
-class _GroupedHistogramPainter extends CustomPainter {
-  _GroupedHistogramPainter({
-    required this.buckets,
-    required this.textStyle,
-    required this.gridColor,
-    required this.mode,
-  });
-
-  final List<_GroupedBucket> buckets;
-  final TextStyle textStyle;
-  final Color gridColor;
-  final AnalyticsChartMode mode;
-
-  static const Color _powerColor = Color(0xFF2563EB);
-  static const Color _voltageColor = Color(0xFF8B5CF6);
-  static const Color _currentColor = Color(0xFF14B8A6);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const left = 52.0;
-    const right = 16.0;
-    const top = 18.0;
-    const bottom = 42.0;
-
-    final chart = Rect.fromLTWH(
-      left,
-      top,
-      size.width - left - right,
-      size.height - top - bottom,
-    );
-
-    final gridPaint = Paint()
-      ..color = gridColor
-      ..strokeWidth = 1;
-
-    for (var i = 0; i <= 4; i++) {
-      final y = chart.top + (chart.height / 4) * i;
-      canvas.drawLine(Offset(chart.left, y), Offset(chart.right, y), gridPaint);
-    }
-
-    if (buckets.isEmpty) {
-      final tp = TextPainter(
-        text: TextSpan(
-          text: 'Sin datos disponibles para este rango',
-          style: textStyle.copyWith(fontSize: 13),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: selected ? scheme.primary : scheme.onSurface,
+          ),
         ),
-        textDirection: TextDirection.ltr,
-        textAlign: TextAlign.center,
-      )..layout(maxWidth: chart.width);
-
-      tp.paint(
-        canvas,
-        Offset(
-          chart.left + (chart.width - tp.width) / 2,
-          chart.top + (chart.height - tp.height) / 2,
-        ),
-      );
-      return;
-    }
-
-    final maxPower = buckets.fold<double>(
-      0.0,
-          (prev, item) => math.max(prev, item.power).toDouble(),
-    );
-    final maxVoltage = buckets.fold<double>(
-      0.0,
-          (prev, item) => math.max(prev, item.voltage).toDouble(),
-    );
-    final maxCurrent = buckets.fold<double>(
-      0.0,
-          (prev, item) => math.max(prev, item.current).toDouble(),
-    );
-
-    double normalize(double value, double max) {
-      if (max <= 0) return 0.0;
-      return (value / max) * 100.0;
-    }
-
-    final compact = mode == AnalyticsChartMode.currentMoment;
-    final groupSpace = chart.width / buckets.length;
-    final groupWidth = compact
-        ? math.min(groupSpace * 0.78, 16.0).toDouble()
-        : math.min(groupSpace * 0.72, 42.0).toDouble();
-
-    final singleBarWidth = (groupWidth / 3).clamp(
-      compact ? 1.6 : 6.0,
-      compact ? 3.8 : 14.0,
-    ).toDouble();
-
-    final barGap = compact ? 0.6 : 2.0;
-
-    for (var i = 0; i < buckets.length; i++) {
-      final bucket = buckets[i];
-      final centerX = chart.left + groupSpace * i + groupSpace / 2;
-      final startX = centerX - (groupWidth / 2);
-
-      final powerPercent = normalize(bucket.power, maxPower);
-      final voltagePercent = normalize(bucket.voltage, maxVoltage);
-      final currentPercent = normalize(bucket.current, maxCurrent);
-
-      _drawBar(
-        canvas: canvas,
-        chart: chart,
-        x: startX,
-        width: singleBarWidth,
-        percent: powerPercent,
-        color: _powerColor,
-      );
-
-      _drawBar(
-        canvas: canvas,
-        chart: chart,
-        x: startX + singleBarWidth + barGap,
-        width: singleBarWidth,
-        percent: voltagePercent,
-        color: _voltageColor,
-      );
-
-      _drawBar(
-        canvas: canvas,
-        chart: chart,
-        x: startX + (singleBarWidth + barGap) * 2,
-        width: singleBarWidth,
-        percent: currentPercent,
-        color: _currentColor,
-      );
-
-      final shouldPaintLabel = compact ? i % 4 == 0 : true;
-      if (shouldPaintLabel) {
-        final labelPainter = TextPainter(
-          text: TextSpan(text: bucket.label, style: textStyle),
-          textDirection: TextDirection.ltr,
-          textAlign: TextAlign.center,
-        )..layout(minWidth: 0, maxWidth: 42);
-
-        labelPainter.paint(
-          canvas,
-          Offset(centerX - labelPainter.width / 2, chart.bottom + 8),
-        );
-      }
-    }
-
-    const axisValues = [100, 75, 50, 25, 0];
-    for (var i = 0; i < axisValues.length; i++) {
-      final y = chart.top + (chart.height / 4) * i;
-      final valuePainter = TextPainter(
-        text: TextSpan(
-          text: '${axisValues[i]}%',
-          style: textStyle,
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout(maxWidth: left - 8);
-
-      valuePainter.paint(canvas, Offset(0, y - valuePainter.height / 2));
-    }
-  }
-
-  void _drawBar({
-    required Canvas canvas,
-    required Rect chart,
-    required double x,
-    required double width,
-    required double percent,
-    required Color color,
-  }) {
-    final normalized = (percent / 100).clamp(0.0, 1.0);
-    final barHeight = normalized * chart.height;
-
-    final rect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        x,
-        chart.bottom - barHeight,
-        width,
-        barHeight,
       ),
-      const Radius.circular(4),
     );
-
-    final fillPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          color,
-          color.withOpacity(0.68),
-        ],
-      ).createShader(chart);
-
-    final borderPaint = Paint()
-      ..color = color.withOpacity(0.28)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-
-    canvas.drawRRect(rect, fillPaint);
-    canvas.drawRRect(rect, borderPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _GroupedHistogramPainter oldDelegate) {
-    return oldDelegate.buckets != buckets ||
-        oldDelegate.textStyle != textStyle ||
-        oldDelegate.gridColor != gridColor ||
-        oldDelegate.mode != mode;
   }
 }
