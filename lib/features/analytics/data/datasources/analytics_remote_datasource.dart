@@ -1,0 +1,129 @@
+import 'package:iot_manager/core/error/app_exception.dart';
+import 'package:iot_manager/core/error/error_mapper.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class AnalyticsRemoteDatasource {
+  AnalyticsRemoteDatasource({SupabaseClient? client})
+      : _client = client ?? Supabase.instance.client;
+
+  final SupabaseClient _client;
+
+  String _requireUserId() {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null || userId.isEmpty) {
+      throw const ValidationAppException('Debes iniciar sesión para acceder a las gráficas.');
+    }
+    return userId;
+  }
+
+  Future<List<Map<String, dynamic>>> getAccessibleDevices() async {
+    try {
+      final userId = _requireUserId();
+
+      final ownedResponse = await _client.from('devices')
+          .select('id, name, home_id, device_type, owner_id, created_at')
+          .eq('owner_id', userId)
+          .order('created_at', ascending: false);
+
+      final owned = (ownedResponse as List)
+          .map((item) => Map<String, dynamic>.from(item as Map)).toList();
+
+      final sharesResponse = await _client
+          .from('device_shares')
+          .select('device_id')
+          .eq('shared_with_user_id', userId)
+          .eq('status', 'accepted');
+
+      final sharedIds = (sharesResponse as List)
+          .map((item) => (item as Map)['device_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty).toSet().toList();
+
+      final shared = <Map<String, dynamic>>[];
+      if (sharedIds.isNotEmpty) {
+        final sharedResponse = await _client.from('devices')
+            .select('id, name, home_id, device_type, owner_id, created_at')
+            .inFilter('id', sharedIds);
+
+        shared.addAll((sharedResponse as List)
+            .map((item) => Map<String, dynamic>.from(item as Map)));
+      }
+
+      final byId = <String, Map<String, dynamic>>{};
+      for (final row in [...owned, ...shared]) {
+        final id = (row['id'] ?? '').toString();
+        if (id.isNotEmpty) byId[id] = row;
+      }
+      return byId.values.toList();
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getAccessibleHomes() async {
+    try {
+      final userId = _requireUserId();
+
+      final ownedResponse = await _client.from('homes')
+          .select('id, name, owner_id, created_at')
+          .eq('owner_id', userId)
+          .order('created_at', ascending: false);
+
+      final owned = (ownedResponse as List)
+          .map((item) => Map<String, dynamic>.from(item as Map)).toList();
+
+      final sharedResponse = await _client
+          .from('home_shares')
+          .select('home_id')
+          .eq('shared_with_user_id', userId)
+          .eq('status', 'accepted');
+
+      final sharedIds = (sharedResponse as List)
+          .map((item) => (item as Map)['home_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty).toSet().toList();
+
+      final shared = <Map<String, dynamic>>[];
+      if (sharedIds.isNotEmpty) {
+        final homesResponse = await _client.from('homes')
+            .select('id, name, owner_id, created_at')
+            .inFilter('id', sharedIds);
+        shared.addAll((homesResponse as List)
+            .map((item) => Map<String, dynamic>.from(item as Map)));
+      }
+
+      final byId = <String, Map<String, dynamic>>{};
+      for (final row in [...owned, ...shared]) {
+        final id = (row['id'] ?? '').toString();
+        if (id.isNotEmpty) byId[id] = row;
+      }
+      return byId.values.toList();
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchReadings({
+    required List<String> deviceIds,
+    required DateTime from,
+    required DateTime to,
+    int limit = 15000,
+  }) async {
+    try {
+      if (deviceIds.isEmpty) return <Map<String, dynamic>>[];
+
+      final response = await _client
+          .from('readings')
+          .select('device_id, ts, power_w, voltage_v, current_a, energy_wh, meta')
+          .inFilter('device_id', deviceIds)
+          .gte('ts', from.toUtc().toIso8601String())
+          .lte('ts', to.toUtc().toIso8601String())
+          .order('ts', ascending: true)
+          .limit(limit);
+
+      return (response as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
+    }
+  }
+}
