@@ -321,11 +321,6 @@ class ProfilePageState extends State<ProfilePage> {
                           onChangePassword: changePassword,
                         ),
                         const SizedBox(height: 18),
-                        ProfilePreferencesCard(
-                          unitPreferences: profile.unitPreferences,
-                          onChanged: updateUnitPreference,
-                        ),
-                        const SizedBox(height: 18),
                         ProfileNotificationsCard(
                           notificationPreferences:
                           profile.notificationPreferences,
