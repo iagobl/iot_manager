@@ -6,4 +6,6 @@ abstract class AnalyticsRepository {
   Future<List<AnalyticsSample>> getSamples(AnalyticsQuery query);
 
   Future<AnalyticsNormalizationLimits> getDeviceNormalizationLimits(String deviceId);
+
+  Future<Map<String, double>> getCurrentPowerByScope(AnalyticsScopeOption scope);
 }

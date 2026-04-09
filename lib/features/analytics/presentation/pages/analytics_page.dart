@@ -190,9 +190,11 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
             else ...[
                 analytics_widgets.AnalyticsSummary(
                   series: state.series,
-                  currentPowerW: state.summary.averagePowerW,
-                  totalConsumptionWh: state.summary.totalEnergyWh,
-                  isOn: state.summary.activeDevices > 0,
+                  currentPowerW: controller.currentPowerW,
+                  totalConsumptionWh: controller.rangeConsumptionWh,
+                  averagePowerW: controller.displayAveragePowerW,
+                  peakPowerW: controller.displayPeakPowerW,
+                  isOn: controller.isCurrentlyOn,
                 ),
                 const SizedBox(height: 18),
                 AnalyticsChart(
@@ -209,8 +211,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                     });
                   },
                   normalizationLimits: state.normalizationLimits,
-                  aggregateMode:
-                  state.selectedGroup == AnalyticsScopeGroup.global,
+                  aggregateMode: state.selectedGroup == AnalyticsScopeGroup.global,
                 ),
               ],
           ],

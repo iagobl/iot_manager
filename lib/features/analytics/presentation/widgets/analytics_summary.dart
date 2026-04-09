@@ -7,12 +7,16 @@ class AnalyticsSummary extends StatelessWidget {
     required this.series,
     required this.currentPowerW,
     required this.totalConsumptionWh,
+    required this.averagePowerW,
+    required this.peakPowerW,
     required this.isOn,
   });
 
   final AnalyticsSeries series;
   final double currentPowerW;
   final double totalConsumptionWh;
+  final double averagePowerW;
+  final double peakPowerW;
   final bool isOn;
 
   @override
@@ -43,7 +47,7 @@ class AnalyticsSummary extends StatelessWidget {
                   width: itemWidth,
                   title: 'Potencia actual',
                   value: '${currentPowerW.toStringAsFixed(1)} W',
-                  subtitle: 'Última lectura',
+                  subtitle: 'Última lectura útil',
                   icon: Icons.flash_on_rounded,
                   accentColor: const Color(0xFF2563EB),
                 ),
@@ -58,7 +62,7 @@ class AnalyticsSummary extends StatelessWidget {
                 _SummaryCard(
                   width: itemWidth,
                   title: 'Potencia media',
-                  value: '${series.averagePowerW.toStringAsFixed(1)} W',
+                  value: '${averagePowerW.toStringAsFixed(1)} W',
                   subtitle: 'Promedio del periodo',
                   icon: Icons.analytics_rounded,
                   accentColor: const Color(0xFF0F766E),
@@ -66,7 +70,7 @@ class AnalyticsSummary extends StatelessWidget {
                 _SummaryCard(
                   width: itemWidth,
                   title: 'Pico máximo',
-                  value: '${series.maxPowerW.toStringAsFixed(1)} W',
+                  value: '${peakPowerW.toStringAsFixed(1)} W',
                   subtitle: 'Valor más alto',
                   icon: Icons.trending_up_rounded,
                   accentColor: const Color(0xFFEA580C),

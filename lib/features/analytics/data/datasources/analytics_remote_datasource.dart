@@ -1,17 +1,21 @@
+import 'package:iot_manager/core/error/app_exception.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
 import 'package:iot_manager/core/iot/shelly/shelly_rpc_client.dart';
-import 'package:iot_manager/core/services/supabase_service.dart';
 import 'package:iot_manager/features/analytics/domain/entities/analytics_models.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AnalyticsRemoteDatasource {
-  AnalyticsRemoteDatasource();
+  AnalyticsRemoteDatasource({SupabaseClient? client})
+      : _client = client ?? Supabase.instance.client;
 
-  final _client = SupabaseService.client;
+  final SupabaseClient _client;
 
   String _requireUserId() {
     final userId = _client.auth.currentUser?.id;
     if (userId == null || userId.isEmpty) {
-      throw const FormatException('No se pudo identificar al usuario actual.');
+      throw const ValidationAppException(
+        'Debes iniciar sesión para acceder a las gráficas.',
+      );
     }
     return userId;
   }
@@ -20,12 +24,15 @@ class AnalyticsRemoteDatasource {
     try {
       final userId = _requireUserId();
 
-      final ownedResponse = await _client.from('devices')
+      final ownedResponse = await _client
+          .from('devices')
           .select('id, name, home_id, device_type, owner_id, identifier, created_at')
-          .eq('owner_id', userId).order('created_at', ascending: false);
+          .eq('owner_id', userId)
+          .order('created_at', ascending: false);
 
       final owned = (ownedResponse as List)
-          .map((item) => Map<String, dynamic>.from(item as Map)).toList();
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
 
       final sharesResponse = await _client
           .from('device_shares')
@@ -35,23 +42,31 @@ class AnalyticsRemoteDatasource {
 
       final sharedIds = (sharesResponse as List)
           .map((item) => (item as Map)['device_id']?.toString() ?? '')
-          .where((id) => id.isNotEmpty).toSet().toList();
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
 
       final shared = <Map<String, dynamic>>[];
       if (sharedIds.isNotEmpty) {
-        final sharedResponse = await _client.from('devices')
+        final sharedResponse = await _client
+            .from('devices')
             .select('id, name, home_id, device_type, owner_id, identifier, created_at')
             .inFilter('id', sharedIds);
 
-        shared.addAll((sharedResponse as List)
-            .map((item) => Map<String, dynamic>.from(item as Map)));
+        shared.addAll(
+          (sharedResponse as List)
+              .map((item) => Map<String, dynamic>.from(item as Map)),
+        );
       }
 
       final byId = <String, Map<String, dynamic>>{};
       for (final row in [...owned, ...shared]) {
         final id = (row['id'] ?? '').toString();
-        if (id.isNotEmpty) byId[id] = row;
+        if (id.isNotEmpty) {
+          byId[id] = row;
+        }
       }
+
       return byId.values.toList();
     } catch (error) {
       throw ErrorMapper.mapException(error);
@@ -62,13 +77,15 @@ class AnalyticsRemoteDatasource {
     try {
       final userId = _requireUserId();
 
-      final ownedResponse = await _client.from('homes')
+      final ownedResponse = await _client
+          .from('homes')
           .select('id, name, owner_id, created_at')
           .eq('owner_id', userId)
           .order('created_at', ascending: false);
 
       final owned = (ownedResponse as List)
-          .map((item) => Map<String, dynamic>.from(item as Map)).toList();
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
 
       final sharedResponse = await _client
           .from('home_shares')
@@ -78,22 +95,31 @@ class AnalyticsRemoteDatasource {
 
       final sharedIds = (sharedResponse as List)
           .map((item) => (item as Map)['home_id']?.toString() ?? '')
-          .where((id) => id.isNotEmpty).toSet().toList();
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
 
       final shared = <Map<String, dynamic>>[];
       if (sharedIds.isNotEmpty) {
-        final homesResponse = await _client.from('homes')
+        final homesResponse = await _client
+            .from('homes')
             .select('id, name, owner_id, created_at')
             .inFilter('id', sharedIds);
-        shared.addAll((homesResponse as List)
-            .map((item) => Map<String, dynamic>.from(item as Map)));
+
+        shared.addAll(
+          (homesResponse as List)
+              .map((item) => Map<String, dynamic>.from(item as Map)),
+        );
       }
 
       final byId = <String, Map<String, dynamic>>{};
       for (final row in [...owned, ...shared]) {
         final id = (row['id'] ?? '').toString();
-        if (id.isNotEmpty) byId[id] = row;
+        if (id.isNotEmpty) {
+          byId[id] = row;
+        }
       }
+
       return byId.values.toList();
     } catch (error) {
       throw ErrorMapper.mapException(error);
@@ -104,7 +130,7 @@ class AnalyticsRemoteDatasource {
     required List<String> deviceIds,
     required DateTime from,
     required DateTime to,
-    int limit = 15000,
+    int limit = 30000,
   }) async {
     try {
       if (deviceIds.isEmpty) return <Map<String, dynamic>>[];
@@ -142,6 +168,7 @@ class AnalyticsRemoteDatasource {
 
       final row = Map<String, dynamic>.from(response as Map);
       final host = (row['identifier'] ?? '').toString().trim();
+
       if (host.isEmpty) {
         return AnalyticsNormalizationLimits.empty;
       }
@@ -162,6 +189,52 @@ class AnalyticsRemoteDatasource {
       );
     } catch (_) {
       return AnalyticsNormalizationLimits.empty;
+    }
+  }
+
+  Future<Map<String, double>> getCurrentPowerByDeviceIds(
+      List<String> deviceIds,
+      ) async {
+    try {
+      if (deviceIds.isEmpty) return <String, double>{};
+
+      final response = await _client
+          .from('devices')
+          .select('id, identifier')
+          .inFilter('id', deviceIds);
+
+      final rows = (response as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+
+      final result = <String, double>{};
+
+      for (final row in rows) {
+        final id = (row['id'] ?? '').toString();
+        final host = (row['identifier'] ?? '').toString().trim();
+
+        if (id.isEmpty || host.isEmpty) {
+          continue;
+        }
+
+        try {
+          final rpc = ShellyRpcClient(host: host);
+          final status = await rpc.call('Switch.GetStatus', params: {'id': 0});
+
+          double toDouble(Object? value) {
+            if (value is num) return value.toDouble();
+            return double.tryParse((value ?? '').toString().replaceAll(',', '.')) ?? 0;
+          }
+
+          result[id] = toDouble(status['apower']);
+        } catch (_) {
+          result[id] = 0.0;
+        }
+      }
+
+      return result;
+    } catch (error) {
+      throw ErrorMapper.mapException(error);
     }
   }
 }

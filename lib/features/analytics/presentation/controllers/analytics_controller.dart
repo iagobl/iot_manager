@@ -1,6 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
 import 'package:iot_manager/features/analytics/data/datasources/analytics_remote_datasource.dart';
@@ -17,17 +17,33 @@ class AnalyticsController extends ChangeNotifier {
   AnalyticsState _state = AnalyticsState.initial();
   AnalyticsState get state => _state;
 
+  List<AnalyticsSample> _samples = const [];
+  Map<String, double> _livePowerByDevice = const {};
+  Timer? _liveRefreshTimer;
   bool _initialized = false;
+
+  bool get isAggregateScope =>
+      _state.selectedScope != null && _state.selectedScope!.type == AnalyticsScopeType.home;
 
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
 
     await _loadInitialData();
+    _startLiveRefresh();
   }
 
-  Future<void> retry() async {
-    await _loadInitialData();
+  @override
+  void dispose() {
+    _liveRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startLiveRefresh() {
+    _liveRefreshTimer?.cancel();
+    _liveRefreshTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      await refreshLivePower();
+    });
   }
 
   Future<void> _loadInitialData() async {
@@ -37,11 +53,11 @@ class AnalyticsController extends ChangeNotifier {
       final scopes = await _repository.getAvailableScopes();
 
       AnalyticsScopeGroup selectedGroup = AnalyticsScopeGroup.global;
-
       AnalyticsScopeOption? selectedScope;
-      final globalScopes = scopes
-          .where((scope) => scope.type == AnalyticsScopeType.allDevices || scope.type == AnalyticsScopeType.home)
-          .toList();
+
+      final globalScopes =
+      scopes.where((scope) => scope.type == AnalyticsScopeType.home).toList();
+
       final deviceScopes =
       scopes.where((scope) => scope.type == AnalyticsScopeType.device).toList();
 
@@ -53,49 +69,13 @@ class AnalyticsController extends ChangeNotifier {
         selectedGroup = AnalyticsScopeGroup.device;
       }
 
-      if (selectedScope == null) {
-        _emit(
-          _state.copyWith(
-            loading: false,
-            scopes: scopes,
-            selectedScope: null,
-            selectedGroup: selectedGroup,
-            series: const AnalyticsSeries(
-              points: [],
-              totalEnergyWh: 0,
-              averagePowerW: 0,
-              averageVoltageV: 0,
-              averageCurrentA: 0,
-              maxPowerW: 0,
-              maxVoltageV: 0,
-              maxCurrentA: 0,
-              minPowerW: 0,
-              minVoltageV: 0,
-              minCurrentA: 0,
-            ),
-            summary: const AnalyticsSummary(
-              totalEnergyWh: 0,
-              averagePowerW: 0,
-              averageVoltageV: 0,
-              averageCurrentA: 0,
-              peakPowerW: 0,
-              peakVoltageV: 0,
-              peakCurrentA: 0,
-              activeDevices: 0,
-              samples: 0,
-            ),
-            normalizationLimits: AnalyticsNormalizationLimits.empty,
-          ),
-        );
-        return;
-      }
-
       final now = DateTime.now();
-      final from = _resolveRangeStart(AnalyticsRangePreset.today, now);
-      final to = _resolveRangeEnd(AnalyticsRangePreset.today, now);
+      final from = DateTime(now.year, now.month, now.day);
+      final to = now;
 
       _emit(
         _state.copyWith(
+          loading: false,
           scopes: scopes,
           selectedScope: selectedScope,
           selectedGroup: selectedGroup,
@@ -106,6 +86,7 @@ class AnalyticsController extends ChangeNotifier {
       );
 
       await refresh();
+      await refreshLivePower();
     } catch (error) {
       _emit(
         _state.copyWith(
@@ -116,14 +97,18 @@ class AnalyticsController extends ChangeNotifier {
     }
   }
 
-  Future<void> refresh() async {
+  Future<void> refresh({bool silent = false}) async {
     final scope = _state.selectedScope;
     if (scope == null) {
-      _emit(_state.copyWith(loading: false));
+      if (!silent) {
+        _emit(_state.copyWith(loading: false));
+      }
       return;
     }
 
-    _emit(_state.copyWith(loading: true, clearError: true));
+    if (!silent) {
+      _emit(_state.copyWith(loading: true, clearError: true));
+    }
 
     try {
       final query = AnalyticsQuery(
@@ -134,8 +119,10 @@ class AnalyticsController extends ChangeNotifier {
       );
 
       final samples = await _repository.getSamples(query);
+      _samples = samples;
+
       final series = AnalyticsSeries.fromSamples(samples);
-      final summary = _repository.buildSummary(samples);
+      final summary = _buildSummary(samples);
 
       AnalyticsNormalizationLimits normalizationLimits =
           AnalyticsNormalizationLimits.empty;
@@ -143,9 +130,8 @@ class AnalyticsController extends ChangeNotifier {
       if (scope.type == AnalyticsScopeType.device &&
           scope.deviceId != null &&
           scope.deviceId!.isNotEmpty) {
-        normalizationLimits = await _repository.getDeviceNormalizationLimits(
-          scope.deviceId!,
-        );
+        normalizationLimits =
+        await _repository.getDeviceNormalizationLimits(scope.deviceId!);
       }
 
       _emit(
@@ -154,6 +140,7 @@ class AnalyticsController extends ChangeNotifier {
           series: series,
           summary: summary,
           normalizationLimits: normalizationLimits,
+          clearError: true,
         ),
       );
     } catch (error) {
@@ -163,6 +150,18 @@ class AnalyticsController extends ChangeNotifier {
           errorMessage: ErrorMapper.mapException(error).message,
         ),
       );
+    }
+  }
+
+  Future<void> refreshLivePower() async {
+    final scope = _state.selectedScope;
+    if (scope == null) return;
+
+    try {
+      _livePowerByDevice = await _repository.getCurrentPowerByScope(scope);
+      notifyListeners();
+    } catch (_) {
+      // dejamos el último valor correcto
     }
   }
 
@@ -180,6 +179,7 @@ class AnalyticsController extends ChangeNotifier {
     );
 
     unawaited(refresh());
+    unawaited(refreshLivePower());
   }
 
   void selectScope(String scopeId) {
@@ -202,6 +202,7 @@ class AnalyticsController extends ChangeNotifier {
     );
 
     unawaited(refresh());
+    unawaited(refreshLivePower());
   }
 
   void selectRangePreset(AnalyticsRangePreset preset) {
@@ -254,11 +255,7 @@ class AnalyticsController extends ChangeNotifier {
     switch (group) {
       case AnalyticsScopeGroup.global:
         return _state.scopes
-            .where(
-              (scope) =>
-          scope.type == AnalyticsScopeType.allDevices ||
-              scope.type == AnalyticsScopeType.home,
-        )
+            .where((scope) => scope.type == AnalyticsScopeType.home)
             .toList();
       case AnalyticsScopeGroup.device:
         return _state.scopes
@@ -272,11 +269,11 @@ class AnalyticsController extends ChangeNotifier {
       case AnalyticsRangePreset.today:
         return DateTime(now.year, now.month, now.day);
       case AnalyticsRangePreset.last7Days:
-        final start = now.subtract(const Duration(days: 6));
-        return DateTime(start.year, start.month, start.day);
+        final weekday = now.weekday;
+        return DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: weekday - 1));
       case AnalyticsRangePreset.last30Days:
-        final start = now.subtract(const Duration(days: 29));
-        return DateTime(start.year, start.month, start.day);
+        return DateTime(now.year, now.month, 1);
       case AnalyticsRangePreset.custom:
         return _state.from;
     }
@@ -306,12 +303,6 @@ class AnalyticsController extends ChangeNotifier {
     }
   }
 
-  String scopeLabel() {
-    final scope = _state.selectedScope;
-    if (scope == null) return 'Sin ámbito';
-    return scope.label;
-  }
-
   String _formatRange(DateTime from, DateTime to) {
     String twoDigits(int value) => value.toString().padLeft(2, '0');
     final fromText =
@@ -320,26 +311,179 @@ class AnalyticsController extends ChangeNotifier {
     return '$fromText - $toText';
   }
 
+  double get currentPowerW {
+    if (_livePowerByDevice.isNotEmpty) {
+      return _livePowerByDevice.values.fold<double>(
+        0.0,
+            (sum, value) => sum + value,
+      );
+    }
+
+    if (_samples.isEmpty) return 0.0;
+
+    if (!isAggregateScope) {
+      final sorted = [..._samples]..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      return sorted.last.powerW;
+    }
+
+    final latestByDevice = <String, AnalyticsSample>{};
+    for (final sample in _samples) {
+      final previous = latestByDevice[sample.deviceId];
+      if (previous == null || sample.timestamp.isAfter(previous.timestamp)) {
+        latestByDevice[sample.deviceId] = sample;
+      }
+    }
+
+    return latestByDevice.values.fold<double>(
+      0.0,
+          (sum, sample) => sum + sample.powerW,
+    );
+  }
+
+  double get displayAveragePowerW {
+    if (_samples.isEmpty) return 0.0;
+
+    if (!isAggregateScope) {
+      return _state.series.averagePowerW;
+    }
+
+    final grouped = <int, double>{};
+
+    for (final sample in _samples) {
+      final key = DateTime(
+        sample.timestamp.year,
+        sample.timestamp.month,
+        sample.timestamp.day,
+        sample.timestamp.hour,
+        sample.timestamp.minute,
+      ).millisecondsSinceEpoch;
+
+      grouped.update(
+        key,
+            (value) => value + sample.powerW,
+        ifAbsent: () => sample.powerW,
+      );
+    }
+
+    if (grouped.isEmpty) return 0.0;
+
+    final values = grouped.values.toList();
+    final total = values.fold<double>(0.0, (sum, value) => sum + value);
+    return total / values.length;
+  }
+
+  double get displayPeakPowerW {
+    if (_samples.isEmpty) return 0.0;
+
+    return _samples.fold<double>(
+      0.0,
+          (maxValue, sample) => math.max(maxValue, sample.powerW),
+    );
+  }
+
+  double get rangeConsumptionWh => _calculateRangeConsumptionWh(_samples);
+
+  bool get isCurrentlyOn => currentPowerW > 0.5;
+
+  AnalyticsSummary _buildSummary(List<AnalyticsSample> samples) {
+    if (samples.isEmpty) {
+      return const AnalyticsSummary(
+        totalEnergyWh: 0,
+        averagePowerW: 0,
+        averageVoltageV: 0,
+        averageCurrentA: 0,
+        peakPowerW: 0,
+        peakVoltageV: 0,
+        peakCurrentA: 0,
+        activeDevices: 0,
+        samples: 0,
+      );
+    }
+
+    final totalEnergyWh = _calculateRangeConsumptionWh(samples);
+
+    final averagePowerW =
+        samples.fold<double>(0.0, (sum, item) => sum + item.powerW) /
+            samples.length;
+    final averageVoltageV =
+        samples.fold<double>(0.0, (sum, item) => sum + item.voltageV) /
+            samples.length;
+    final averageCurrentA =
+        samples.fold<double>(0.0, (sum, item) => sum + item.currentA) /
+            samples.length;
+
+    final peakPowerW = samples.fold<double>(
+      0.0,
+          (maxValue, item) => math.max(maxValue, item.powerW),
+    );
+    final peakVoltageV = samples.fold<double>(
+      0.0,
+          (maxValue, item) => math.max(maxValue, item.voltageV),
+    );
+    final peakCurrentA = samples.fold<double>(
+      0.0,
+          (maxValue, item) => math.max(maxValue, item.currentA),
+    );
+
+    final activeDevices = samples
+        .where((sample) => sample.powerW > 0.0)
+        .map((sample) => sample.deviceId)
+        .toSet()
+        .length;
+
+    return AnalyticsSummary(
+      totalEnergyWh: totalEnergyWh,
+      averagePowerW: averagePowerW,
+      averageVoltageV: averageVoltageV,
+      averageCurrentA: averageCurrentA,
+      peakPowerW: peakPowerW,
+      peakVoltageV: peakVoltageV,
+      peakCurrentA: peakCurrentA,
+      activeDevices: activeDevices,
+      samples: samples.length,
+    );
+  }
+
+  double _calculateRangeConsumptionWh(List<AnalyticsSample> input) {
+    if (input.isEmpty) return 0.0;
+
+    final byDevice = <String, List<AnalyticsSample>>{};
+    for (final sample in input) {
+      byDevice.putIfAbsent(sample.deviceId, () => <AnalyticsSample>[]).add(sample);
+    }
+
+    double total = 0.0;
+
+    for (final entries in byDevice.values) {
+      entries.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+      if (entries.length < 2) continue;
+
+      for (var i = 1; i < entries.length; i++) {
+        final previous = entries[i - 1].energyWh;
+        final current = entries[i].energyWh;
+        final delta = current - previous;
+
+        if (delta.isFinite && delta > 0) {
+          total += delta;
+        }
+      }
+    }
+
+    return total;
+  }
+
   Future<void> exportPdf(BuildContext context) async {
     _emit(_state.copyWith(exporting: true, clearError: true));
 
-    try {
-      await Future<void>.delayed(const Duration(milliseconds: 800));
+    await Future<void>.delayed(const Duration(milliseconds: 500));
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('La exportación en PDF estará disponible próximamente.'),
-          ),
-        );
-      }
+    _emit(_state.copyWith(exporting: false));
 
-      _emit(_state.copyWith(exporting: false));
-    } catch (error) {
-      _emit(
-        _state.copyWith(
-          exporting: false,
-          errorMessage: ErrorMapper.mapException(error).message,
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('La exportación PDF se deja para el siguiente ajuste.'),
         ),
       );
     }
