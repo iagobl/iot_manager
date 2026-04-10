@@ -115,8 +115,8 @@ class DeviceChartsController extends ChangeNotifier {
   }
 
   void setRange(ChartRange newRange) {
-    if (range == newRange) return;
-    range = newRange;
+    if (range == ChartRange.today) return;
+    range = ChartRange.today;
     errorMessage = null;
     unawaited(load(initial: true));
     notifyListeners();
@@ -720,10 +720,10 @@ PreparedChartData buildConsumptionData({
   final sortedKeys = buckets.keys.toList()..sort();
 
   final points = sortedKeys.map((key) => ChartPoint(
-      x: key,
-      value: buckets[key]!,
-      label: xLabelForRange(key, range),
-    ),
+    x: key,
+    value: buckets[key]!,
+    label: xLabelForRange(key, range),
+  ),
   ).toList();
 
   return PreparedChartData(

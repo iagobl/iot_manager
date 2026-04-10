@@ -94,11 +94,6 @@ class DeviceChartsSectionState extends State<DeviceChartsSection>
     controller.setMetric(metric);
   }
 
-  void onRangeChanged(ChartRange range) {
-    controller.clearError();
-    controller.setRange(range);
-  }
-
   @override
   void dispose() {
     controller.removeListener(refresh);
@@ -122,15 +117,13 @@ class DeviceChartsSectionState extends State<DeviceChartsSection>
             deviceName: widget.deviceName,
             metric: controller.metric,
             range: controller.range,
-            exportingPdf: controller.exportingPdf,
-            onExportPdf: onExportPdf,
           ),
           const SizedBox(height: 14),
           SelectorCard(
             metric: controller.metric,
-            range: controller.range,
+            exportingPdf: controller.exportingPdf,
             onMetricChanged: onMetricChanged,
-            onRangeChanged: onRangeChanged,
+            onExportPdf: onExportPdf,
           ),
           const SizedBox(height: 14),
           if (controller.loading && controller.rows.isEmpty)
@@ -180,15 +173,11 @@ class ChartsHeroHeader extends StatelessWidget {
     required this.deviceName,
     required this.metric,
     required this.range,
-    required this.exportingPdf,
-    required this.onExportPdf,
   });
 
   final String deviceName;
   final ChartMetric metric;
   final ChartRange range;
-  final bool exportingPdf;
-  final Future<void> Function() onExportPdf;
 
   @override
   Widget build(BuildContext context) {
@@ -253,45 +242,23 @@ class ChartsHeroHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              FilledButton.icon(
-                onPressed: exportingPdf ? null : onExportPdf,
-                icon: exportingPdf ? SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(scheme.onPrimary),
-                  ),
-                ) : const Icon(Icons.picture_as_pdf_outlined),
-                label: Text(exportingPdf ? 'Generando...' : 'PDF'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          Row(
             children: [
-              HeaderChip(
-                icon: metricIcon(metric),
-                label: chartMetricLabel(metric),
+              Expanded(
+                child: HeaderChip(
+                  icon: metricIcon(metric),
+                  label: chartMetricLabel(metric),
+                ),
               ),
-              HeaderChip(
-                icon: Icons.schedule_rounded,
-                label: chartRangeLabel(range),
-              ),
-              const HeaderChip(
-                icon: Icons.sync_rounded,
-                label: 'Actualización automática',
+              const SizedBox(width: 8),
+              Expanded(
+                child: HeaderChip(
+                  icon: Icons.sync_rounded,
+                  label: 'Automaticamente',
+                ),
               ),
             ],
           ),
@@ -345,15 +312,15 @@ class SelectorCard extends StatelessWidget {
   const SelectorCard({
     super.key,
     required this.metric,
-    required this.range,
+    required this.exportingPdf,
     required this.onMetricChanged,
-    required this.onRangeChanged,
+    required this.onExportPdf,
   });
 
   final ChartMetric metric;
-  final ChartRange range;
+  final bool exportingPdf;
   final ValueChanged<ChartMetric> onMetricChanged;
-  final ValueChanged<ChartRange> onRangeChanged;
+  final Future<void> Function() onExportPdf;
 
   @override
   Widget build(BuildContext context) {
@@ -373,53 +340,59 @@ class SelectorCard extends StatelessWidget {
           ),
         ],
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          children: [
-            Expanded(
-              child: SelectorColumn<ChartMetric>(
-                title: 'Métrica',
-                value: metric,
-                items: const [
-                  PillItem(
-                    value: ChartMetric.consumption,
-                    label: 'Consumo',
-                    icon: Icons.bolt_outlined,
-                  ),
-                  PillItem(
-                    value: ChartMetric.power,
-                    label: 'Potencia',
-                    icon: Icons.flash_on_outlined,
-                  ),
-                  PillItem(
-                    value: ChartMetric.voltage,
-                    label: 'Voltaje',
-                    icon: Icons.electrical_services_outlined,
-                  ),
-                ],
-                onChanged: onMetricChanged,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SelectorColumn<ChartMetric>(
+            title: 'Métrica',
+            value: metric,
+            horizontal: true,
+            items: const [
+              PillItem(
+                value: ChartMetric.power,
+                label: 'Potencia',
+                icon: Icons.flash_on_outlined,
+              ),
+              PillItem(
+                value: ChartMetric.voltage,
+                label: 'Voltaje',
+                icon: Icons.electrical_services_outlined,
+              ),
+            ],
+            onChanged: onMetricChanged,
+          ),
+          const SizedBox(height: 16),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: scheme.outlineVariant.withValues(alpha: 0.9),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: exportingPdf ? null : onExportPdf,
+              icon: exportingPdf ? SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(scheme.onPrimary),
+                ),
+              ) : const Icon(Icons.picture_as_pdf_outlined),
+              label: Text(exportingPdf ? 'Generando PDF...' : 'Exportar PDF'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
               ),
             ),
-            const SizedBox(width: 14),
-            Container(
-              width: 1,
-              color: scheme.outline.withValues(alpha: 0.10),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: SelectorColumn<ChartRange>(
-                title: 'Período',
-                value: range,
-                items: const [
-                  PillItem(value: ChartRange.today, label: 'Hoy'),
-                  PillItem(value: ChartRange.week, label: '7 días'),
-                  PillItem(value: ChartRange.month, label: '30 días'),
-                ],
-                onChanged: onRangeChanged,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -432,12 +405,14 @@ class SelectorColumn<T> extends StatelessWidget {
     required this.value,
     required this.items,
     required this.onChanged,
+    this.horizontal = false,
   });
 
   final String title;
   final T value;
   final List<PillItem<T>> items;
   final ValueChanged<T> onChanged;
+  final bool horizontal;
 
   @override
   Widget build(BuildContext context) {
@@ -447,18 +422,40 @@ class SelectorColumn<T> extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title,
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: scheme.onSurfaceVariant),
-        ),
-        const SizedBox(height: 10),
-        ...items.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: PillButton<T>(
-              item: item,
-              selected: item.value == value,
-              onTap: () => onChanged(item.value),
-            ),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: scheme.onSurfaceVariant,
           ),
         ),
+        const SizedBox(height: 10),
+        if (horizontal)
+          Row(children:
+          items.asMap().entries.map((entry) => Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    right: entry.key == items.length - 1 ? 0 : 8,
+                  ),
+                  child: PillButton<T>(
+                    item: entry.value,
+                    selected: entry.value.value == value,
+                    onTap: () => onChanged(entry.value.value),
+                  ),
+                ),
+              ),
+            )
+                .toList(),
+          )
+        else
+          ...items.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: PillButton<T>(
+                item: item,
+                selected: item.value == value,
+                onTap: () => onChanged(item.value),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -767,7 +764,7 @@ class StatCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.w800,
               color: scheme.onSurface,
               height: 1,
