@@ -378,7 +378,41 @@ class DeviceTimerSectionState extends State<DeviceTimerSection> {
     );
   }
 
-  Widget sectionCard(
+  Widget topSectionCard(
+      BuildContext context, {
+        required Widget child,
+      }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.primary.withValues(alpha: 0.12),
+            colorScheme.primary.withValues(alpha: 0.04),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: colorScheme.primary.withValues(alpha: 0.14),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget normalSectionCard(
       BuildContext context, {
         required Widget child,
       }) {
@@ -400,7 +434,7 @@ class DeviceTimerSectionState extends State<DeviceTimerSection> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return sectionCard(
+    return normalSectionCard(
       context,
       child: Column(
         children: [
@@ -564,7 +598,7 @@ class DeviceTimerSectionState extends State<DeviceTimerSection> {
     return ListView(
       padding: const EdgeInsets.only(bottom: 24),
       children: [
-        sectionCard(
+        topSectionCard(
           context,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

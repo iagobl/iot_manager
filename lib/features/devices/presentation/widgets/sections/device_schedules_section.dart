@@ -301,8 +301,7 @@ class DeviceSchedulesSectionState extends State<DeviceSchedulesSection> {
     if (created) {
       showSnack('Horario guardado correctamente.');
     } else {
-      showControllerError(fallback: 'No se pudo guardar el horario.',
-      );
+      showControllerError(fallback: 'No se pudo guardar el horario.');
     }
   }
 
@@ -392,7 +391,7 @@ class DeviceSchedulesSectionState extends State<DeviceSchedulesSection> {
     return ListView(
       padding: const EdgeInsets.only(bottom: 24),
       children: [
-        sectionCard(
+        topSectionCard(
           context,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -456,7 +455,7 @@ class DeviceSchedulesSectionState extends State<DeviceSchedulesSection> {
         ),
         const SizedBox(height: 14),
         if (controller.error != null && controller.schedules.isEmpty)
-          sectionCard(
+          normalSectionCard(
             context,
             child: Text(
               controller.error!,
@@ -467,7 +466,7 @@ class DeviceSchedulesSectionState extends State<DeviceSchedulesSection> {
             ),
           ),
         if (controller.schedules.isEmpty)
-          sectionCard(
+          normalSectionCard(
             context,
             child: Column(
               children: [
@@ -513,15 +512,13 @@ class DeviceSchedulesSectionState extends State<DeviceSchedulesSection> {
                 : 'Hora no disponible';
 
             final actionLabel = action == 'off' ? 'Apagar' : 'Encender';
-            final actionColor = action == 'off'
-                ? colorScheme.error
-                : colorScheme.primary;
+            final actionColor = action == 'off' ? colorScheme.error : colorScheme.primary;
 
             final daysLabel = DeviceSchedulesController.formatDays(days);
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 14),
-              child: sectionCard(
+              child: normalSectionCard(
                 context,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -595,7 +592,38 @@ class DeviceSchedulesSectionState extends State<DeviceSchedulesSection> {
     );
   }
 
-  Widget sectionCard(BuildContext context, {required Widget child}) {
+  Widget topSectionCard(BuildContext context, {required Widget child}) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.primary.withValues(alpha: 0.12),
+            colorScheme.primary.withValues(alpha: 0.04),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: colorScheme.primary.withValues(alpha: 0.14),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget normalSectionCard(BuildContext context, {required Widget child}) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
@@ -603,15 +631,15 @@ class DeviceSchedulesSectionState extends State<DeviceSchedulesSection> {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+          color: colorScheme.outline.withValues(alpha: 0.18),
         ),
-        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: colorScheme.shadow.withValues(alpha: 0.03),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
