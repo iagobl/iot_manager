@@ -27,8 +27,7 @@ class AnalyticsSummary extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 6),
-        Text(
-          'Marcadores sobre el consumo eléctrico, en el periodo de tiempo seleccionado.',
+        Text('Marcadores sobre el consumo eléctrico, en el periodo de tiempo seleccionado.',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             color: scheme.onSurfaceVariant,
           ),
@@ -43,7 +42,7 @@ class AnalyticsSummary extends StatelessWidget {
               spacing: spacing,
               runSpacing: spacing,
               children: [
-                _SummaryCard(
+                SummaryCard(
                   width: itemWidth,
                   title: 'Potencia actual',
                   value: '${currentPowerW.toStringAsFixed(1)} W',
@@ -51,15 +50,15 @@ class AnalyticsSummary extends StatelessWidget {
                   icon: Icons.flash_on_rounded,
                   accentColor: const Color(0xFF2563EB),
                 ),
-                _SummaryCard(
+                SummaryCard(
                   width: itemWidth,
                   title: 'Consumo rango',
-                  value: _formatWh(totalConsumptionWh),
+                  value: formatWh(totalConsumptionWh),
                   subtitle: 'Consumo del periodo',
                   icon: Icons.bolt_rounded,
                   accentColor: const Color(0xFF7C3AED),
                 ),
-                _SummaryCard(
+                SummaryCard(
                   width: itemWidth,
                   title: 'Potencia media',
                   value: '${averagePowerW.toStringAsFixed(1)} W',
@@ -67,7 +66,7 @@ class AnalyticsSummary extends StatelessWidget {
                   icon: Icons.analytics_rounded,
                   accentColor: const Color(0xFF0F766E),
                 ),
-                _SummaryCard(
+                SummaryCard(
                   width: itemWidth,
                   title: 'Pico máximo',
                   value: '${peakPowerW.toStringAsFixed(1)} W',
@@ -83,7 +82,7 @@ class AnalyticsSummary extends StatelessWidget {
     );
   }
 
-  String _formatWh(double value) {
+  String formatWh(double value) {
     if (value >= 1000) {
       return '${(value / 1000).toStringAsFixed(2)} kWh';
     }
@@ -91,8 +90,8 @@ class AnalyticsSummary extends StatelessWidget {
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
+class SummaryCard extends StatelessWidget {
+  const SummaryCard({super.key,
     required this.width,
     required this.title,
     required this.value,
@@ -116,14 +115,12 @@ class _SummaryCard extends StatelessWidget {
       width: width,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: scheme.surface.withOpacity(0.96),
+        color: scheme.surface.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: scheme.outlineVariant.withOpacity(0.65),
-        ),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.65)),
         boxShadow: [
           BoxShadow(
-            color: scheme.shadow.withOpacity(0.05),
+            color: scheme.shadow.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -136,14 +133,13 @@ class _SummaryCard extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.12),
+              color: accentColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: accentColor, size: 18),
           ),
           const SizedBox(height: 10),
-          Text(
-            title,
+          Text(title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -153,8 +149,7 @@ class _SummaryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            value,
+          Text(value,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -164,8 +159,7 @@ class _SummaryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Text(
-            subtitle,
+          Text(subtitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(

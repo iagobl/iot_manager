@@ -61,6 +61,7 @@ class AnalyticsPoint {
     required this.voltageV,
     required this.currentA,
     required this.energyWh,
+    this.deviceId,
   });
 
   final DateTime timestamp;
@@ -68,6 +69,7 @@ class AnalyticsPoint {
   final double voltageV;
   final double currentA;
   final double energyWh;
+  final String? deviceId;
 }
 
 class AnalyticsSeries {
@@ -126,16 +128,22 @@ class AnalyticsSeries {
         voltageV: sample.voltageV,
         currentA: sample.currentA,
         energyWh: sample.energyWh,
+        deviceId: sample.deviceId,
       ),
     )
         .toList();
 
-    final totalEnergy = sorted.fold<double>(0, (sum, sample) => sum + sample.energyWh);
-    final avgPower = sorted.fold<double>(0, (sum, sample) => sum + sample.powerW) / sorted.length;
+    final totalEnergy =
+    sorted.fold<double>(0, (sum, sample) => sum + sample.energyWh);
+    final avgPower =
+        sorted.fold<double>(0, (sum, sample) => sum + sample.powerW) /
+            sorted.length;
     final avgVoltage =
-        sorted.fold<double>(0, (sum, sample) => sum + sample.voltageV) / sorted.length;
+        sorted.fold<double>(0, (sum, sample) => sum + sample.voltageV) /
+            sorted.length;
     final avgCurrent =
-        sorted.fold<double>(0, (sum, sample) => sum + sample.currentA) / sorted.length;
+        sorted.fold<double>(0, (sum, sample) => sum + sample.currentA) /
+            sorted.length;
 
     final powerValues = sorted.map((sample) => sample.powerW).toList();
     final voltageValues = sorted.map((sample) => sample.voltageV).toList();
@@ -233,33 +241,6 @@ class AnalyticsNormalizationLimits {
 }
 
 class AnalyticsState {
-  const AnalyticsState({
-    required this.loading,
-    required this.exporting,
-    required this.scopes,
-    required this.selectedScope,
-    required this.selectedGroup,
-    required this.rangePreset,
-    required this.from,
-    required this.to,
-    required this.series,
-    required this.summary,
-    required this.normalizationLimits,
-    this.errorMessage,
-  });
-
-  final bool loading;
-  final bool exporting;
-  final List<AnalyticsScopeOption> scopes;
-  final AnalyticsScopeOption? selectedScope;
-  final AnalyticsScopeGroup selectedGroup;
-  final AnalyticsRangePreset rangePreset;
-  final DateTime from;
-  final DateTime to;
-  final AnalyticsSeries series;
-  final AnalyticsSummary summary;
-  final AnalyticsNormalizationLimits normalizationLimits;
-  final String? errorMessage;
 
   factory AnalyticsState.initial() {
     final now = DateTime.now();
@@ -301,6 +282,33 @@ class AnalyticsState {
       normalizationLimits: AnalyticsNormalizationLimits.empty,
     );
   }
+  const AnalyticsState({
+    required this.loading,
+    required this.exporting,
+    required this.scopes,
+    required this.selectedScope,
+    required this.selectedGroup,
+    required this.rangePreset,
+    required this.from,
+    required this.to,
+    required this.series,
+    required this.summary,
+    required this.normalizationLimits,
+    this.errorMessage,
+  });
+
+  final bool loading;
+  final bool exporting;
+  final List<AnalyticsScopeOption> scopes;
+  final AnalyticsScopeOption? selectedScope;
+  final AnalyticsScopeGroup selectedGroup;
+  final AnalyticsRangePreset rangePreset;
+  final DateTime from;
+  final DateTime to;
+  final AnalyticsSeries series;
+  final AnalyticsSummary summary;
+  final AnalyticsNormalizationLimits normalizationLimits;
+  final String? errorMessage;
 
   AnalyticsState copyWith({
     bool? loading,

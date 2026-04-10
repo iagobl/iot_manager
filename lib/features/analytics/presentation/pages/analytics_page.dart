@@ -10,36 +10,34 @@ class AnalyticsPage extends StatefulWidget {
   const AnalyticsPage({super.key});
 
   @override
-  State<AnalyticsPage> createState() => _AnalyticsPageState();
+  State<AnalyticsPage> createState() => AnalyticsPageState();
 }
 
-class _AnalyticsPageState extends State<AnalyticsPage> {
+class AnalyticsPageState extends State<AnalyticsPage> {
   late final AnalyticsController controller;
-  AnalyticsChartMode _todayMode = AnalyticsChartMode.currentMoment;
-  bool _filtersExpanded = true;
+  AnalyticsChartMode todayMode = AnalyticsChartMode.currentMoment;
+  bool filtersExpanded = true;
 
   @override
   void initState() {
     super.initState();
-    controller = AnalyticsController()
-      ..addListener(_refresh)
-      ..initialize();
+    controller = AnalyticsController()..addListener(refresh)..initialize();
   }
 
   @override
   void dispose() {
-    controller.removeListener(_refresh);
+    controller.removeListener(refresh);
     controller.dispose();
     super.dispose();
   }
 
-  void _refresh() {
+  void refresh() {
     if (mounted) {
       setState(() {});
     }
   }
 
-  Future<void> _pickCustomRange() async {
+  Future<void> pickCustomRange() async {
     final state = controller.state;
     final now = DateTime.now();
     final firstDate = DateTime(now.year - 1, now.month, now.day);
@@ -66,10 +64,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       context: context,
       firstDate: firstDate,
       lastDate: lastDate,
-      initialDateRange: DateTimeRange(
-        start: safeStart,
-        end: safeEnd,
-      ),
+      initialDateRange: DateTimeRange(start: safeStart, end: safeEnd),
       saveText: 'Aplicar',
       helpText: 'Selecciona un rango',
       cancelText: 'Cancelar',
@@ -114,10 +109,10 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
     }
   }
 
-  AnalyticsChartMode _resolveChartMode(AnalyticsState state) {
+  AnalyticsChartMode resolveChartMode(AnalyticsState state) {
     switch (state.rangePreset) {
       case AnalyticsRangePreset.today:
-        return _todayMode;
+        return todayMode;
       case AnalyticsRangePreset.last7Days:
         return AnalyticsChartMode.weekDays;
       case AnalyticsRangePreset.last30Days:
@@ -138,8 +133,10 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final state = controller.state;
-    final chartMode = _resolveChartMode(state);
+    final chartMode = resolveChartMode(state);
     final showTodayModes = state.rangePreset == AnalyticsRangePreset.today;
+    final chartSeries = chartMode == AnalyticsChartMode.currentMoment
+        ? controller.currentMomentChartSeries : state.series;
 
     return AppPageBackground(
       variant: AppPageBackgroundVariant.homeSoft,
@@ -149,26 +146,26 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
           children: [
-            _HeroCard(
+            HeroCard(
               scopeLabel: state.selectedScope?.label ?? 'Sin seleccionar',
               rangeLabel: controller.rangeLabel(),
               exporting: state.exporting,
               onExport: () => controller.exportPdf(context),
             ),
             const SizedBox(height: 16),
-            _FiltersCard(
+            FiltersCard(
               controller: controller,
               state: state,
-              expanded: _filtersExpanded,
+              expanded: filtersExpanded,
               onToggleExpanded: () {
                 setState(() {
-                  _filtersExpanded = !_filtersExpanded;
+                  filtersExpanded = !filtersExpanded;
                 });
               },
-              onCustomRangeTap: _pickCustomRange,
+              onCustomRangeTap: pickCustomRange,
             ),
             const SizedBox(height: 18),
-            const _SectionDivider(label: 'Resumen del periodo'),
+            const SectionDivider(label: 'Resumen del periodo'),
             const SizedBox(height: 18),
             if (state.loading && state.series.isEmpty)
               const Padding(
@@ -198,16 +195,13 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                 ),
                 const SizedBox(height: 18),
                 AnalyticsChart(
-                  series: state.series,
-                  range: DateTimeRange(
-                    start: state.from,
-                    end: state.to,
-                  ),
+                  series: chartSeries,
+                  range: DateTimeRange(start: state.from, end: state.to),
                   mode: chartMode,
                   showTodayModeSelector: showTodayModes,
                   onModeChanged: (value) {
                     setState(() {
-                      _todayMode = value;
+                      todayMode = value;
                     });
                   },
                   normalizationLimits: state.normalizationLimits,
@@ -221,8 +215,8 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
   }
 }
 
-class _FiltersCard extends StatelessWidget {
-  const _FiltersCard({
+class FiltersCard extends StatelessWidget {
+  const FiltersCard({super.key,
     required this.controller,
     required this.state,
     required this.expanded,
@@ -239,13 +233,11 @@ class _FiltersCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-
     final globalScopes = controller.scopesForGroup(AnalyticsScopeGroup.global);
     final deviceScopes = controller.scopesForGroup(AnalyticsScopeGroup.device);
-
     final visibleScopes = controller.scopesForGroup(state.selectedGroup);
-
     String? selectedScopeId;
+
     if (state.selectedScope != null &&
         visibleScopes.any((item) => item.id == state.selectedScope!.id)) {
       selectedScopeId = state.selectedScope!.id;
@@ -256,10 +248,10 @@ class _FiltersCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: scheme.surface.withOpacity(0.96),
+        color: scheme.surface.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: scheme.outlineVariant.withOpacity(0.65),
+          color: scheme.outlineVariant.withValues(alpha: 0.65),
         ),
       ),
       child: Column(
@@ -271,8 +263,7 @@ class _FiltersCard extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    'Filtros de análisis',
+                  child: Text('Filtros de análisis',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -291,8 +282,7 @@ class _FiltersCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Text(
-            'Selecciona el ámbito y el rango temporal del análisis.',
+          Text('Selecciona el ámbito y el rango temporal del análisis.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: scheme.onSurfaceVariant,
             ),
@@ -305,31 +295,27 @@ class _FiltersCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 16),
-                const _SectionLabel(label: 'Ámbito'),
+                const SectionLabel(label: 'Ámbito'),
                 const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
-                      child: _ScopeGroupCard(
+                      child: ScopeGroupCard(
                         title: 'Conjuntos',
                         selected: state.selectedGroup == AnalyticsScopeGroup.global,
                         enabled: globalScopes.isNotEmpty,
-                        onTap: globalScopes.isEmpty
-                            ? null
-                            : () => controller.selectGroup(
+                        onTap: globalScopes.isEmpty ? null : () => controller.selectGroup(
                           AnalyticsScopeGroup.global,
                         ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: _ScopeGroupCard(
+                      child: ScopeGroupCard(
                         title: 'Dispositivo',
                         selected: state.selectedGroup == AnalyticsScopeGroup.device,
                         enabled: deviceScopes.isNotEmpty,
-                        onTap: deviceScopes.isEmpty
-                            ? null
-                            : () => controller.selectGroup(
+                        onTap: deviceScopes.isEmpty ? null : () => controller.selectGroup(
                           AnalyticsScopeGroup.device,
                         ),
                       ),
@@ -338,40 +324,34 @@ class _FiltersCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
-                  value: selectedScopeId,
+                  initialValue: selectedScopeId,
                   decoration: InputDecoration(
                     labelText: state.selectedGroup == AnalyticsScopeGroup.device
-                        ? 'Selecciona dispositivo'
-                        : 'Selecciona conjunto',
+                        ? 'Selecciona dispositivo' : 'Selecciona conjunto',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
                     filled: true,
                     fillColor: scheme.surfaceContainerLowest,
                   ),
-                  items: visibleScopes
-                      .map(
-                        (scope) => DropdownMenuItem<String>(
+                  items: visibleScopes.map((scope) => DropdownMenuItem<String>(
                       value: scope.id,
                       child: Text(scope.label),
                     ),
-                  )
-                      .toList(),
-                  onChanged: visibleScopes.isEmpty
-                      ? null
-                      : (value) {
+                  ).toList(),
+                  onChanged: visibleScopes.isEmpty ? null : (value) {
                     if (value != null) {
                       controller.selectScope(value);
                     }
                   },
                 ),
                 const SizedBox(height: 18),
-                const _SectionLabel(label: 'Rango temporal'),
+                const SectionLabel(label: 'Rango temporal'),
                 const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
-                      child: _RangeChip(
+                      child: RangeChip(
                         label: 'Hoy',
                         selected: state.rangePreset == AnalyticsRangePreset.today,
                         onTap: () => controller.selectRangePreset(
@@ -381,7 +361,7 @@ class _FiltersCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: _RangeChip(
+                      child: RangeChip(
                         label: 'Semana actual',
                         selected:
                         state.rangePreset == AnalyticsRangePreset.last7Days,
@@ -392,7 +372,7 @@ class _FiltersCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: _RangeChip(
+                      child: RangeChip(
                         label: 'Personalizado',
                         selected: state.rangePreset == AnalyticsRangePreset.custom,
                         onTap: () async {
@@ -412,8 +392,8 @@ class _FiltersCard extends StatelessWidget {
   }
 }
 
-class _ScopeGroupCard extends StatelessWidget {
-  const _ScopeGroupCard({
+class ScopeGroupCard extends StatelessWidget {
+  const ScopeGroupCard({super.key,
     required this.title,
     required this.selected,
     required this.enabled,
@@ -430,19 +410,19 @@ class _ScopeGroupCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     final backgroundColor = !enabled
-        ? scheme.surfaceContainerHighest.withOpacity(0.35)
+        ? scheme.surfaceContainerHighest.withValues(alpha: 0.35)
         : selected
-        ? scheme.primary.withOpacity(0.10)
+        ? scheme.primary.withValues(alpha: 0.10)
         : scheme.surfaceContainerLowest;
 
     final borderColor = !enabled
-        ? scheme.outlineVariant.withOpacity(0.35)
+        ? scheme.outlineVariant.withValues(alpha: 0.35)
         : selected
-        ? scheme.primary.withOpacity(0.55)
-        : scheme.outlineVariant.withOpacity(0.55);
+        ? scheme.primary.withValues(alpha: 0.55)
+        : scheme.outlineVariant.withValues(alpha: 0.55);
 
     final foregroundColor = !enabled
-        ? scheme.onSurfaceVariant.withOpacity(0.50)
+        ? scheme.onSurfaceVariant.withValues(alpha: 0.50)
         : selected
         ? scheme.primary
         : scheme.onSurface;
@@ -460,15 +440,13 @@ class _ScopeGroupCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(
-              selected ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+            Icon(selected ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
               size: 20,
               color: foregroundColor,
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                title,
+              child: Text(title,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   color: foregroundColor,
                   fontWeight: FontWeight.w700,
@@ -482,8 +460,8 @@ class _ScopeGroupCard extends StatelessWidget {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.label});
+class SectionLabel extends StatelessWidget {
+  const SectionLabel({super.key, required this.label});
 
   final String label;
 
@@ -491,8 +469,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Text(
-      label,
+    return Text(label,
       style: Theme.of(context).textTheme.titleMedium?.copyWith(
         fontWeight: FontWeight.w800,
         color: scheme.onSurface,
@@ -501,8 +478,8 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _SectionDivider extends StatelessWidget {
-  const _SectionDivider({required this.label});
+class SectionDivider extends StatelessWidget {
+  const SectionDivider({super.key, required this.label});
 
   final String label;
 
@@ -515,13 +492,12 @@ class _SectionDivider extends StatelessWidget {
         Expanded(
           child: Container(
             height: 1,
-            color: scheme.outlineVariant.withOpacity(0.7),
+            color: scheme.outlineVariant.withValues(alpha: 0.7),
           ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            label,
+          child: Text(label,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w800,
             ),
@@ -530,7 +506,7 @@ class _SectionDivider extends StatelessWidget {
         Expanded(
           child: Container(
             height: 1,
-            color: scheme.outlineVariant.withOpacity(0.7),
+            color: scheme.outlineVariant.withValues(alpha: 0.7),
           ),
         ),
       ],
@@ -538,8 +514,8 @@ class _SectionDivider extends StatelessWidget {
   }
 }
 
-class _HeroCard extends StatelessWidget {
-  const _HeroCard({
+class HeroCard extends StatelessWidget {
+  const HeroCard({super.key,
     required this.scopeLabel,
     required this.rangeLabel,
     required this.exporting,
@@ -562,14 +538,12 @@ class _HeroCard extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            scheme.primary.withOpacity(0.14),
-            scheme.surface.withOpacity(0.94),
+            scheme.primary.withValues(alpha: 0.14),
+            scheme.surface.withValues(alpha: 0.94),
           ],
         ),
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          color: scheme.primary.withOpacity(0.16),
-        ),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.16)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -580,28 +554,23 @@ class _HeroCard extends StatelessWidget {
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color: scheme.primary.withOpacity(0.16),
+                  color: scheme.primary.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(
-                  Icons.query_stats_rounded,
-                  color: scheme.primary,
-                ),
+                child: Icon(Icons.query_stats_rounded, color: scheme.primary),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Centro analítico',
+                    Text('Centro analítico',
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      'Comparativa visual del consumo agrupada por periodos temporales.',
+                    Text('Comparativa visual del consumo agrupada por periodos temporales.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
@@ -616,25 +585,18 @@ class _HeroCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _InfoChip(
-                icon: Icons.layers_rounded,
-                label: scopeLabel,
-              ),
-              _InfoChip(
-                icon: Icons.schedule_rounded,
-                label: rangeLabel,
-              ),
-              const _InfoChip(
-                icon: Icons.bar_chart_rounded,
-                label: 'Histograma comparativo',
+              InfoChip(icon: Icons.layers_rounded, label: scopeLabel),
+              InfoChip(icon: Icons.schedule_rounded, label: rangeLabel),
+              const InfoChip(
+                  icon: Icons.bar_chart_rounded,
+                  label: 'Histograma comparativo'
               ),
             ],
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: exporting ? null : onExport,
-            icon: exporting
-                ? SizedBox(
+            icon: exporting ? SizedBox(
               width: 16,
               height: 16,
               child: CircularProgressIndicator(
@@ -643,19 +605,14 @@ class _HeroCard extends StatelessWidget {
                   scheme.onPrimary,
                 ),
               ),
-            )
-                : const Icon(Icons.picture_as_pdf_outlined),
-            label: Text(
-              exporting ? 'Generando PDF...' : 'Exportar informe PDF',
-            ),
+            ) : const Icon(Icons.picture_as_pdf_outlined),
+            label: Text(exporting ? 'Generando PDF...' : 'Exportar informe PDF'),
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(
                 horizontal: 18,
                 vertical: 14,
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             ),
           ),
         ],
@@ -664,8 +621,8 @@ class _HeroCard extends StatelessWidget {
   }
 }
 
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({
+class InfoChip extends StatelessWidget {
+  const InfoChip({super.key,
     required this.icon,
     required this.label,
   });
@@ -680,19 +637,16 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: scheme.surface.withOpacity(0.84),
+        color: scheme.surface.withValues(alpha: 0.84),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: scheme.outlineVariant.withOpacity(0.60),
-        ),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.60)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 16, color: scheme.primary),
           const SizedBox(width: 8),
-          Text(
-            label,
+          Text(label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.w700,
             ),
@@ -703,8 +657,8 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
-class _RangeChip extends StatelessWidget {
-  const _RangeChip({
+class RangeChip extends StatelessWidget {
+  const RangeChip({super.key,
     required this.label,
     required this.selected,
     required this.onTap,
@@ -726,27 +680,21 @@ class _RangeChip extends StatelessWidget {
         height: 52,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected
-              ? scheme.primary.withOpacity(0.14)
+          color: selected ? scheme.primary.withValues(alpha: 0.14)
               : scheme.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected
-                ? scheme.primary.withOpacity(0.50)
-                : scheme.outlineVariant.withOpacity(0.75),
+          border: Border.all(color: selected
+              ? scheme.primary.withValues(alpha: 0.50)
+              : scheme.outlineVariant.withValues(alpha: 0.75),
           ),
-          boxShadow: selected
-              ? [
-            BoxShadow(
-              color: scheme.primary.withOpacity(0.10),
+          boxShadow: selected ? [BoxShadow(
+              color: scheme.primary.withValues(alpha: 0.10),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
-          ]
-              : null,
+          ] : null,
         ),
-        child: Text(
-          label,
+        child: Text(label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,

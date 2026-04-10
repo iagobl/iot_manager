@@ -22,19 +22,19 @@ class AnalyticsSelector extends StatelessWidget {
       spacing: 10,
       runSpacing: 10,
       children: [
-        _SelectorChip(
+        SelectorChip(
           label: 'Potencia',
           color: const Color(0xFF2563EB),
           selected: selected == AnalyticsMetricView.power,
           onTap: () => onChanged(AnalyticsMetricView.power),
         ),
-        _SelectorChip(
+        SelectorChip(
           label: 'Voltaje',
           color: const Color(0xFF8B5CF6),
           selected: selected == AnalyticsMetricView.voltage,
           onTap: () => onChanged(AnalyticsMetricView.voltage),
         ),
-        _SelectorChip(
+        SelectorChip(
           label: 'Corriente',
           color: const Color(0xFF14B8A6),
           selected: selected == AnalyticsMetricView.current,
@@ -45,8 +45,8 @@ class AnalyticsSelector extends StatelessWidget {
   }
 }
 
-class _SelectorChip extends StatelessWidget {
-  const _SelectorChip({
+class SelectorChip extends StatelessWidget {
+  const SelectorChip({super.key,
     required this.label,
     required this.color,
     required this.selected,
@@ -70,22 +70,19 @@ class _SelectorChip extends StatelessWidget {
         curve: Curves.easeOut,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.12) : scheme.surface,
+          color: selected ? color.withValues(alpha: 0.12) : scheme.surface,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: selected
-                ? color.withOpacity(0.35)
-                : scheme.outlineVariant.withOpacity(0.7),
+            color: selected ? color.withValues(alpha: 0.35)
+                : scheme.outlineVariant.withValues(alpha: 0.7),
           ),
-          boxShadow: selected
-              ? [
+          boxShadow: selected ? [
             BoxShadow(
-              color: color.withOpacity(0.10),
+              color: color.withValues(alpha: 0.10),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
-          ]
-              : null,
+          ] : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -96,8 +93,7 @@ class _SelectorChip extends StatelessWidget {
               color: color,
             ),
             const SizedBox(width: 8),
-            Text(
-              label,
+            Text(label,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: selected ? color : scheme.onSurface,

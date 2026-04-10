@@ -3,14 +3,14 @@ import 'package:iot_manager/features/analytics/domain/entities/analytics_models.
 import 'package:iot_manager/features/analytics/domain/repositories/analytics_repository.dart';
 
 class AnalyticsRepositoryImpl implements AnalyticsRepository {
-  AnalyticsRepositoryImpl(this._remoteDatasource);
+  AnalyticsRepositoryImpl(this.remoteDatasource);
 
-  final AnalyticsRemoteDatasource _remoteDatasource;
+  final AnalyticsRemoteDatasource remoteDatasource;
 
   @override
   Future<List<AnalyticsScopeOption>> getAvailableScopes() async {
-    final homes = await _remoteDatasource.getAccessibleHomes();
-    final devices = await _remoteDatasource.getAccessibleDevices();
+    final homes = await remoteDatasource.getAccessibleHomes();
+    final devices = await remoteDatasource.getAccessibleDevices();
 
     final options = <AnalyticsScopeOption>[];
 
@@ -40,20 +40,18 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
           subtitle: (device['device_type'] ?? 'Dispositivo').toString(),
           type: AnalyticsScopeType.device,
           deviceId: id,
-          homeId: (device['home_id'] ?? '').toString().isEmpty
-              ? null
+          homeId: (device['home_id'] ?? '').toString().isEmpty ? null
               : (device['home_id'] ?? '').toString(),
         ),
       );
     }
-
     return options;
   }
 
   @override
   Future<List<AnalyticsSample>> getSamples(AnalyticsQuery query) async {
-    final devices = await _remoteDatasource.getAccessibleDevices();
-    final homes = await _remoteDatasource.getAccessibleHomes();
+    final devices = await remoteDatasource.getAccessibleDevices();
+    final homes = await remoteDatasource.getAccessibleHomes();
 
     final homeNameById = <String, String>{
       for (final home in homes)
@@ -71,12 +69,10 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
       }
     }).toList();
 
-    final deviceIds = filteredDevices
-        .map((device) => (device['id'] ?? '').toString())
-        .where((id) => id.isNotEmpty)
-        .toList();
+    final deviceIds = filteredDevices.map((device) => (device['id'] ?? '').toString())
+        .where((id) => id.isNotEmpty).toList();
 
-    final rows = await _remoteDatasource.fetchReadings(
+    final rows = await remoteDatasource.fetchReadings(
       deviceIds: deviceIds,
       from: query.from,
       to: query.to,
@@ -95,8 +91,7 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
       final deviceId = (row['device_id'] ?? '').toString();
       final device = deviceById[deviceId] ?? const <String, dynamic>{};
 
-      final meta = row['meta'] is Map
-          ? Map<String, dynamic>.from(row['meta'] as Map)
+      final meta = row['meta'] is Map ? Map<String, dynamic>.from(row['meta'] as Map)
           : <String, dynamic>{};
 
       final homeId = (device['home_id'] ?? '').toString();
@@ -134,8 +129,7 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
         deviceName: (device['name'] ?? 'Dispositivo').toString(),
         homeId: homeId.isEmpty ? null : homeId,
         homeName: homeId.isEmpty ? null : homeNameById[homeId],
-        timestamp: DateTime.tryParse((row['ts'] ?? '').toString())?.toLocal() ??
-            DateTime.now(),
+        timestamp: DateTime.tryParse((row['ts'] ?? '').toString())?.toLocal() ?? DateTime.now(),
         powerW: power,
         voltageV: voltage,
         currentA: current,
@@ -145,18 +139,13 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
   }
 
   @override
-  Future<AnalyticsNormalizationLimits> getDeviceNormalizationLimits(
-      String deviceId,
-      ) {
-    return _remoteDatasource.getDeviceNormalizationLimits(deviceId);
+  Future<AnalyticsNormalizationLimits> getDeviceNormalizationLimits(String deviceId) {
+    return remoteDatasource.getDeviceNormalizationLimits(deviceId);
   }
 
   @override
-  Future<Map<String, double>> getCurrentPowerByScope(
-      AnalyticsScopeOption scope,
-      ) async {
-    final devices = await _remoteDatasource.getAccessibleDevices();
-
+  Future<Map<String, double>> getCurrentPowerByScope(AnalyticsScopeOption scope) async {
+    final devices = await remoteDatasource.getAccessibleDevices();
     final filteredDeviceIds = devices.where((device) {
       switch (scope.type) {
         case AnalyticsScopeType.allDevices:
@@ -166,10 +155,8 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
         case AnalyticsScopeType.device:
           return (device['id'] ?? '').toString() == (scope.deviceId ?? '');
       }
-    }).map((device) => (device['id'] ?? '').toString())
-        .where((id) => id.isNotEmpty)
-        .toList();
+    }).map((device) => (device['id'] ?? '').toString()).where((id) => id.isNotEmpty).toList();
 
-    return _remoteDatasource.getCurrentPowerByDeviceIds(filteredDeviceIds);
+    return remoteDatasource.getCurrentPowerByDeviceIds(filteredDeviceIds);
   }
 }

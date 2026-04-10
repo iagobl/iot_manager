@@ -21,25 +21,25 @@ class AnalyticsStats extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: _StatItem(
+          child: StatItem(
             label: 'Mínimo',
-            value: _formatValue(min),
+            value: formatValue(min),
             color: color,
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: _StatItem(
+          child: StatItem(
             label: 'Máximo',
-            value: _formatValue(max),
+            value: formatValue(max),
             color: color,
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: _StatItem(
+          child: StatItem(
             label: 'Media',
-            value: _formatValue(avg),
+            value: formatValue(avg),
             color: color,
           ),
         ),
@@ -47,14 +47,14 @@ class AnalyticsStats extends StatelessWidget {
     );
   }
 
-  String _formatValue(double value) {
+  String formatValue(double value) {
     final decimals = unit == 'A' ? 3 : 1;
     return '${value.toStringAsFixed(decimals)} $unit';
   }
 }
 
-class _StatItem extends StatelessWidget {
-  const _StatItem({
+class StatItem extends StatelessWidget {
+  const StatItem({
     required this.label,
     required this.value,
     required this.color,
@@ -71,25 +71,23 @@ class _StatItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: scheme.surface.withOpacity(0.96),
+        color: scheme.surface.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: scheme.outlineVariant.withOpacity(0.65),
+          color: scheme.outlineVariant.withValues(alpha: 0.65),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
+          Text(label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: scheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 6),
-          Text(
-            value,
+          Text(value,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w800,
               color: color,
