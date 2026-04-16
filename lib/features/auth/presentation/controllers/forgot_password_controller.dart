@@ -1,14 +1,13 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:iot_manager/core/error/app_failure.dart';
-
 import 'package:iot_manager/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:iot_manager/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:iot_manager/features/auth/domain/entities/auth_email_request.dart';
 import 'package:iot_manager/features/auth/domain/usecases/reset_password.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ForgotPasswordController extends ChangeNotifier {
-
   ForgotPasswordController(this.resetPassword);
 
   factory ForgotPasswordController.create() {
@@ -19,6 +18,7 @@ class ForgotPasswordController extends ChangeNotifier {
 
     return ForgotPasswordController(useCase);
   }
+
   final ResetPassword resetPassword;
 
   bool isLoading = false;
@@ -34,7 +34,11 @@ class ForgotPasswordController extends ChangeNotifier {
     clearError();
 
     try {
-      await resetPassword(email.trim());
+      await resetPassword(
+        AuthEmailRequest(
+          email: email.trim(),
+        ),
+      );
       return true;
     } on AppFailure catch (e) {
       setError(e.message);

@@ -1,17 +1,13 @@
+import 'package:iot_manager/features/auth/domain/entities/auth_credentials.dart';
+import 'package:iot_manager/features/auth/domain/entities/auth_email_request.dart';
+import 'package:iot_manager/features/auth/domain/entities/auth_registration.dart';
+
 abstract class AuthRepository {
-  Future<void> signIn({
-    required String email,
-    required String password,
-  });
+  Future<void> signIn(AuthCredentials credentials);
 
-  Future<void> signUpCreateProfile({
-    required String email,
-    required String password,
-    required String firstName,
-    required String lastName,
-  });
+  Future<void> signUpCreateProfile(AuthRegistration registration);
 
-  Future<void> resetPassword(String email);
+  Future<void> resetPassword(AuthEmailRequest request);
 
   Future<void> signOut();
 }

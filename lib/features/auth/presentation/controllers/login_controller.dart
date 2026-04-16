@@ -1,14 +1,13 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:iot_manager/core/error/app_failure.dart';
-
 import 'package:iot_manager/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:iot_manager/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:iot_manager/features/auth/domain/entities/auth_credentials.dart';
 import 'package:iot_manager/features/auth/domain/usecases/sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginController extends ChangeNotifier {
-
   factory LoginController.create() {
     final client = Supabase.instance.client;
     final datasource = AuthRemoteDatasource(client);
@@ -36,8 +35,10 @@ class LoginController extends ChangeNotifier {
 
     try {
       await signIn(
-        email: email.trim(),
-        password: password,
+        AuthCredentials(
+          email: email.trim(),
+          password: password,
+        ),
       );
       return true;
     } on AppFailure catch (e) {

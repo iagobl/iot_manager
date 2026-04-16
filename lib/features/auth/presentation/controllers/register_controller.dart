@@ -1,14 +1,13 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:iot_manager/core/error/app_failure.dart';
-
 import 'package:iot_manager/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:iot_manager/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:iot_manager/features/auth/domain/entities/auth_registration.dart';
 import 'package:iot_manager/features/auth/domain/usecases/sign_up_create_profile.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RegisterController extends ChangeNotifier {
-
   factory RegisterController.create() {
     final client = Supabase.instance.client;
     final datasource = AuthRemoteDatasource(client);
@@ -38,10 +37,12 @@ class RegisterController extends ChangeNotifier {
 
     try {
       await signUpAndCreateProfile(
-        email: email.trim(),
-        password: password,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+        AuthRegistration(
+          email: email.trim(),
+          password: password,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+        ),
       );
       return true;
     } on AppFailure catch (e) {

@@ -2,21 +2,22 @@ import 'dart:async';
 
 import 'package:iot_manager/core/error/app_exception.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
-
+import 'package:iot_manager/features/auth/data/models/auth_profile_model.dart';
+import 'package:iot_manager/features/auth/domain/entities/auth_credentials.dart';
+import 'package:iot_manager/features/auth/domain/entities/auth_email_request.dart';
+import 'package:iot_manager/features/auth/domain/entities/auth_registration.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthRemoteDatasource {
   AuthRemoteDatasource(this._client);
+
   final SupabaseClient _client;
 
-  Future<void> signIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> signIn(AuthCredentials credentials) async {
     try {
       await _client.auth.signInWithPassword(
-        email: email,
-        password: password,
+        email: credentials.email.trim(),
+        password: credentials.password,
       ).timeout(const Duration(seconds: 15));
     } on TimeoutException {
       throw const TimeoutAppException(
@@ -27,16 +28,11 @@ class AuthRemoteDatasource {
     }
   }
 
-  Future<void> signUpCreateProfile({
-    required String email,
-    required String password,
-    required String firstName,
-    required String lastName,
-  }) async {
+  Future<void> signUpCreateProfile(AuthRegistration registration) async {
     try {
       final res = await _client.auth.signUp(
-        email: email,
-        password: password,
+        email: registration.email.trim(),
+        password: registration.password,
       ).timeout(const Duration(seconds: 15));
 
       final userId = res.user?.id ?? _client.auth.currentUser?.id;
@@ -46,23 +42,17 @@ class AuthRemoteDatasource {
         );
       }
 
-      await _client.from('profiles').upsert({
-        'id': userId,
-        'first_name': firstName.trim(),
-        'last_name': lastName.trim(),
-        'email': email.trim(),
-        'avatar_url': null,
-        'unit_preferences': {
-          'energy': 'kWh',
-          'power': 'W',
-          'voltage': 'V',
-        },
-        'notification_preferences': {
-          'incidents': true,
-          'device_status': true,
-          'sharing': true,
-        },
-      }).timeout(const Duration(seconds: 15));
+      final profileModel = AuthProfileModel(
+        id: userId,
+        firstName: registration.firstName,
+        lastName: registration.lastName,
+        email: registration.email,
+      );
+
+      await _client
+          .from('profiles')
+          .upsert(profileModel.toMap())
+          .timeout(const Duration(seconds: 15));
     } on TimeoutException {
       throw const TimeoutAppException(
         'La operación tardó demasiado. Revisa la conexión.',
@@ -72,10 +62,10 @@ class AuthRemoteDatasource {
     }
   }
 
-  Future<void> resetPassword(String email) async {
+  Future<void> resetPassword(AuthEmailRequest request) async {
     try {
       await _client.auth
-          .resetPasswordForEmail(email.trim())
+          .resetPasswordForEmail(request.email.trim())
           .timeout(const Duration(seconds: 15));
     } on TimeoutException {
       throw const TimeoutAppException(
