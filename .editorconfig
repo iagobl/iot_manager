@@ -1,0 +1,68 @@
+# EditorConfig
+# Mantiene un estilo consistente entre Android Studio, VS Code y otros editores.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Dart / Flutter
+[*.dart]
+indent_style = space
+indent_size = 2
+
+# YAML
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# JSON
+[*.json]
+indent_style = space
+indent_size = 2
+
+# Markdown
+[*.md]
+trim_trailing_whitespace = false
+
+# XML / Android resources
+[*.xml]
+indent_style = space
+indent_size = 2
+
+# Kotlin / Gradle Kotlin DSL
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+
+# Java / Groovy / Gradle
+[*.{java,groovy,gradle}]
+indent_style = space
+indent_size = 4
+
+# Shell
+[*.{sh,bash}]
+indent_style = space
+indent_size = 2
+
+# Windows batch / PowerShell
+[*.{bat,cmd,ps1}]
+indent_style = space
+indent_size = 2
+
+# HTML / CSS / JS / TS
+[*.{html,css,js,ts}]
+indent_style = space
+indent_size = 2
+
+# Makefiles deben usar tab
+[Makefile]
+indent_style = tab
+
+# Archivos de texto plano
+[*.txt]
+trim_trailing_whitespace = false
