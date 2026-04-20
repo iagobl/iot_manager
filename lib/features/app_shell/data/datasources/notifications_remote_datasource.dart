@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:iot_manager/core/error/app_exception.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,12 +11,16 @@ class NotificationsRemoteDatasource {
 
   final SupabaseClient _client;
 
+  StreamController<void>? notificationsController;
+  RealtimeChannel? deviceSharesChannel;
+  RealtimeChannel? incidentsChannel;
+
   Future<List<Map<String, dynamic>>> getPendingInvitations() async {
     try {
       final userId = requireUserId();
 
       final response = await _client.from('device_shares').select(
-        'id, device_id, owner_id, shared_with_email, created_at, status',
+        'id, device_id, owner_id, shared_with_email, shared_with_user_id, created_at, status',
       )
           .eq('shared_with_user_id', userId)
           .eq('status', 'pending')
@@ -90,7 +96,8 @@ class NotificationsRemoteDatasource {
         throw const ValidationAppException('No se ha encontrado una invitación válida.');
       }
 
-      await _client.from('device_shares').update({'status': 'accepted',
+      await _client.from('device_shares').update({
+        'status': 'accepted',
         'accepted_at': DateTime.now().toUtc().toIso8601String(),
         'revoked_at': null,
       }).match({
@@ -111,8 +118,10 @@ class NotificationsRemoteDatasource {
         throw const ValidationAppException('No se ha encontrado una invitación válida.');
       }
 
-      await _client.from('device_shares').update({'status': 'rejected',
-      }).match({'id': normalizedId, 'shared_with_user_id': userId,});
+      await _client.from('device_shares').update({'status': 'rejected',}).match({
+        'id': normalizedId,
+        'shared_with_user_id': userId,
+      });
     } catch (error) {
       throw ErrorMapper.mapException(error);
     }
@@ -137,7 +146,9 @@ class NotificationsRemoteDatasource {
       final sharedRows = (sharedRowsResponse as List)
           .map((item) => Map<String, dynamic>.from(item as Map)).toList();
 
-      final sharedDeviceIds = sharedRows.map((row) => (row['device_id'] ?? '').toString())
+      final sharedDeviceIds = sharedRows
+          .map((row) => (row['device_id'] ?? '')
+          .toString())
           .where((id) => id.isNotEmpty)
           .toSet()
           .toList();
@@ -166,9 +177,7 @@ class NotificationsRemoteDatasource {
         for (final row in allDevices) (row['id'] ?? '').toString(): row,
       };
 
-      final deviceIds = deviceById.keys
-          .where((id) => id.isNotEmpty)
-          .toList();
+      final deviceIds = deviceById.keys.where((id) => id.isNotEmpty).toList();
 
       if (deviceIds.isEmpty) {
         return <Map<String, dynamic>>[];
@@ -216,32 +225,91 @@ class NotificationsRemoteDatasource {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getNotifications() async {
-    final deviceInvites = await _client
-        .from('device_shares')
-        .select()
-        .eq('status', 'pending');
+  Stream<void> watchNotificationEvents() {
+    notificationsController ??= StreamController<void>.broadcast(
+      onListen: () {
+        unawaited(ensureRealtimeListeners());
+      },
+      onCancel: () {
+        unawaited(disposeRealtimeListeners());
+      },
+    );
 
-    final homeInvites = await _client
-        .from('home_shares')
-        .select()
-        .eq('status', 'pending');
+    return notificationsController!.stream;
+  }
 
-    final deviceList = deviceInvites.map((e) {
-      return {
-        ...e,
-        'type': 'device_invitation',
-      };
-    });
+  Future<void> ensureRealtimeListeners() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null || userId.isEmpty) {
+      return;
+    }
 
-    final homeList = homeInvites.map((e) {
-      return {
-        ...e,
-        'type': 'home_invitation',
-      };
-    });
+    if (deviceSharesChannel != null || incidentsChannel != null) {
+      return;
+    }
 
-    return [...deviceList, ...homeList];
+    deviceSharesChannel = _client
+        .channel('app-shell-device-shares-$userId')
+        .onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'device_shares',
+      callback: (payload) {
+        final newRecord = payload.newRecord;
+        final oldRecord = payload.oldRecord;
+
+        final sharedWithUserId = (newRecord['shared_with_user_id'] ??
+            oldRecord['shared_with_user_id'] ?? '').toString();
+
+        final ownerId = (newRecord['owner_id'] ?? oldRecord['owner_id'] ?? '')
+            .toString();
+
+        if (sharedWithUserId == userId || ownerId == userId) {
+          emitNotificationEvent();
+        }
+      },
+    )
+        .subscribe();
+
+    incidentsChannel = _client.channel('app-shell-incidents-$userId').onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'incidents',
+      callback: (_) {emitNotificationEvent();},
+    ).subscribe();
+  }
+
+  Future<void> disposeRealtimeListeners() async {
+    final futures = <Future<dynamic>>[];
+
+    if (deviceSharesChannel != null) {
+      futures.add(_client.removeChannel(deviceSharesChannel!));
+      deviceSharesChannel = null;
+    }
+
+    if (incidentsChannel != null) {
+      futures.add(_client.removeChannel(incidentsChannel!));
+      incidentsChannel = null;
+    }
+
+    if (futures.isNotEmpty) {
+      await Future.wait(futures);
+    }
+  }
+
+  void emitNotificationEvent() {
+    final controller = notificationsController;
+    if (controller == null || controller.isClosed) {
+      return;
+    }
+
+    controller.add(null);
+  }
+
+  Future<void> disposeWatcher() async {
+    await disposeRealtimeListeners();
+    await notificationsController?.close();
+    notificationsController = null;
   }
 
   String requireUserId() {

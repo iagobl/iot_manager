@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:iot_manager/core/error/app_exception.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
@@ -12,20 +14,36 @@ import 'package:iot_manager/features/app_shell/domain/usecases/get_notifications
 import 'package:iot_manager/features/app_shell/domain/usecases/reject_invitation_notification.dart';
 
 class NotificationsController extends ChangeNotifier {
-  NotificationsController({
+  factory NotificationsController({
     NotificationsRepository? repository,
     GetNotifications? getNotifications,
     AcceptInvitationNotification? acceptInvitationNotification,
     RejectInvitationNotification? rejectInvitationNotification,
     AcknowledgeIncidentNotification? acknowledgeIncidentNotification,
-  })  : repository = repository ?? NotificationsRepositoryImpl(),
-        getNotifications = getNotifications ?? GetNotifications(repository ?? NotificationsRepositoryImpl()),
-        acceptInvitationNotification = acceptInvitationNotification ??
-            AcceptInvitationNotification(repository ?? NotificationsRepositoryImpl()),
-        rejectInvitationNotification = rejectInvitationNotification ??
-            RejectInvitationNotification(repository ?? NotificationsRepositoryImpl()),
-        acknowledgeIncidentNotification = acknowledgeIncidentNotification ??
-            AcknowledgeIncidentNotification(repository ?? NotificationsRepositoryImpl());
+  }) {
+    final resolvedRepository = repository ?? NotificationsRepositoryImpl();
+
+    return NotificationsController._(
+      repository: resolvedRepository,
+      getNotifications:
+      getNotifications ?? GetNotifications(resolvedRepository),
+      acceptInvitationNotification: acceptInvitationNotification ??
+          AcceptInvitationNotification(resolvedRepository),
+      rejectInvitationNotification: rejectInvitationNotification ??
+          RejectInvitationNotification(resolvedRepository),
+      acknowledgeIncidentNotification:
+      acknowledgeIncidentNotification ??
+          AcknowledgeIncidentNotification(resolvedRepository),
+    );
+  }
+
+  NotificationsController._({
+    required this.repository,
+    required this.getNotifications,
+    required this.acceptInvitationNotification,
+    required this.rejectInvitationNotification,
+    required this.acknowledgeIncidentNotification,
+  });
 
   final NotificationsRepository repository;
   final GetNotifications getNotifications;
@@ -37,6 +55,10 @@ class NotificationsController extends ChangeNotifier {
   String? errorMessage;
   List<AppNotification> items = [];
 
+  Timer? refreshTimer;
+  StreamSubscription<void>? watchSubscription;
+  bool disposed = false;
+
   int get pendingCount => items.where((e) => !e.isResolved).length;
   bool get hasError => errorMessage != null && errorMessage!.trim().isNotEmpty;
 
@@ -45,35 +67,82 @@ class NotificationsController extends ChangeNotifier {
   }
 
   void setMappedError(Object error) {
-    errorMessage = ErrorMapper.mapFailure(ErrorMapper.mapException(error)).message;
+    errorMessage =
+        ErrorMapper.mapFailure(ErrorMapper.mapException(error)).message;
+  }
+
+  Future<void> startLiveUpdates() async {
+    watchSubscription ??=
+        repository.watchNotificationEvents().listen((_) async {
+          await refreshSilently();
+        });
+
+    refreshTimer ??= Timer.periodic(
+      const Duration(seconds: 20),
+          (_) {
+        unawaited(refreshSilently());
+      },
+    );
+
+    if (items.isEmpty && !loading) {
+      await load();
+    }
   }
 
   Future<void> load() async {
-    loading = true;
-    clearError();
-    notifyListeners();
+    await _loadInternal(showLoader: true);
+  }
+
+  Future<void> refresh() async {
+    await _loadInternal(showLoader: true);
+  }
+
+  Future<void> refreshSilently() async {
+    await _loadInternal(showLoader: false);
+  }
+
+  Future<void> _loadInternal({required bool showLoader}) async {
+    if (loading) return;
+
+    if (showLoader) {
+      loading = true;
+      clearError();
+      notifyListeners();
+    } else {
+      clearError();
+    }
 
     try {
       items = await getNotifications();
     } catch (error) {
       setMappedError(error);
-      items = [];
+      if (showLoader) {
+        items = [];
+      }
     } finally {
-      loading = false;
-      notifyListeners();
+      if (showLoader) {
+        loading = false;
+      }
+      if (!disposed) {
+        notifyListeners();
+      }
     }
   }
 
   Future<void> accept(String shareId) async {
     final normalizedId = shareId.trim();
     if (normalizedId.isEmpty) {
-      final error = const ValidationAppException('No se ha encontrado una invitación válida.');
+      final error = const ValidationAppException(
+        'No se ha encontrado una invitación válida.',
+      );
       setMappedError(error);
       notifyListeners();
       throw error;
     }
 
-    final index = items.indexWhere((e) => e is DeviceInvitationNotification && e.id == normalizedId);
+    final index = items.indexWhere(
+          (e) => e is DeviceInvitationNotification && e.id == normalizedId,
+    );
 
     AppNotification? backup;
     if (index != -1) {
@@ -100,13 +169,17 @@ class NotificationsController extends ChangeNotifier {
   Future<void> reject(String shareId) async {
     final normalizedId = shareId.trim();
     if (normalizedId.isEmpty) {
-      final error = const ValidationAppException('No se ha encontrado una invitación válida.',);
+      final error = const ValidationAppException(
+        'No se ha encontrado una invitación válida.',
+      );
       setMappedError(error);
       notifyListeners();
       throw error;
     }
 
-    final index = items.indexWhere((e) => e is DeviceInvitationNotification && e.id == normalizedId);
+    final index = items.indexWhere(
+          (e) => e is DeviceInvitationNotification && e.id == normalizedId,
+    );
 
     AppNotification? backup;
     if (index != -1) {
@@ -133,13 +206,17 @@ class NotificationsController extends ChangeNotifier {
   Future<void> acknowledgeIncident(String incidentId) async {
     final normalizedId = incidentId.trim();
     if (normalizedId.isEmpty) {
-      final error = const ValidationAppException('No se ha encontrado una incidencia válida.');
+      final error = const ValidationAppException(
+        'No se ha encontrado una incidencia válida.',
+      );
       setMappedError(error);
       notifyListeners();
       throw error;
     }
 
-    final index = items.indexWhere((e) => e is DeviceIncidentNotification && e.id == normalizedId);
+    final index = items.indexWhere(
+          (e) => e is DeviceIncidentNotification && e.id == normalizedId,
+    );
 
     AppNotification? backup;
     if (index != -1) {
@@ -163,7 +240,12 @@ class NotificationsController extends ChangeNotifier {
     }
   }
 
-  Future<void> refresh() async {
-    await load();
+  @override
+  void dispose() {
+    disposed = true;
+    refreshTimer?.cancel();
+    watchSubscription?.cancel();
+    unawaited(repository.disposeWatcher());
+    super.dispose();
   }
 }

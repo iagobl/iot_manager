@@ -8,4 +8,8 @@ abstract class NotificationsRepository {
   Future<void> rejectInvitation(String shareId);
 
   Future<void> acknowledgeIncident(String incidentId);
+
+  Stream<void> watchNotificationEvents();
+
+  Future<void> disposeWatcher();
 }

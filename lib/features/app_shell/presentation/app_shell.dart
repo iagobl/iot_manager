@@ -35,7 +35,7 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     notificationsController = NotificationsController()..addListener(rebuild);
-    notificationsController.load();
+    notificationsController.startLiveUpdates();
   }
 
   @override
@@ -51,7 +51,7 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
-  Future<void> _logout() async {
+  Future<void> logout() async {
     await Supabase.instance.client.auth.signOut();
 
     if (!mounted) return;
@@ -69,7 +69,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> openNotifications() async {
-    await notificationsController.load();
+    await notificationsController.refresh();
     if (!mounted) return;
 
     await showModalBottomSheet<void>(
@@ -81,7 +81,7 @@ class _AppShellState extends State<AppShell> {
         child: DeviceNotificationsSheet(
           controller: notificationsController,
           onInvitationsChanged: () async {
-            await notificationsController.load();
+            await notificationsController.refreshSilently();
             await _devicesKey.currentState?.refreshFromShell();
             await _homeKey.currentState?.refreshFromTabReselect();
           },
@@ -131,7 +131,7 @@ class _AppShellState extends State<AppShell> {
             ShellTopBar(
               title: title,
               subtitle: subtitle,
-              onLogout: _logout,
+              onLogout: logout,
               onProfileTap: _openProfile,
               notificationsCount: notificationsController.pendingCount,
               onNotificationsTap: openNotifications,

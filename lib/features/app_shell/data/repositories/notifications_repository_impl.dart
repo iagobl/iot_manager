@@ -23,10 +23,7 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
     final incidentItems = incidentRows.map(DeviceIncidentNotificationModel.fromMap)
         .cast<AppNotification>();
 
-    final items = <AppNotification>[
-      ...incidentItems,
-      ...invitationItems,
-    ];
+    final items = <AppNotification>[...incidentItems, ...invitationItems];
 
     items.sort((a, b) {
       final aDate = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -50,5 +47,15 @@ class NotificationsRepositoryImpl implements NotificationsRepository {
   @override
   Future<void> acknowledgeIncident(String incidentId) {
     return remoteDatasource.acknowledgeIncident(incidentId);
+  }
+
+  @override
+  Stream<void> watchNotificationEvents() {
+    return remoteDatasource.watchNotificationEvents();
+  }
+
+  @override
+  Future<void> disposeWatcher() {
+    return remoteDatasource.disposeWatcher();
   }
 }

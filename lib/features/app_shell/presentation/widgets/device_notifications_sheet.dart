@@ -27,7 +27,7 @@ class DeviceNotificationsSheetState extends State<DeviceNotificationsSheet> {
   void initState() {
     super.initState();
     ctrl.addListener(onControllerChanged);
-    ctrl.load();
+    ctrl.refreshSilently();
   }
 
   @override
@@ -203,8 +203,9 @@ class DeviceNotificationsSheetState extends State<DeviceNotificationsSheet> {
                 style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800,),
               ),
               const SizedBox(height: 6),
-              Text(
-                ctrl.items.isEmpty ? '' : 'Aquí verás invitaciones y alertas de seguridad recientes.',
+              Text(ctrl.items.isEmpty
+                    ? 'Aquí aparecerán tus invitaciones y alertas importantes.'
+                    : 'Aquí verás invitaciones y alertas de seguridad recientes.',
                 style: textTheme.bodyMedium?.copyWith(
                   color: cs.onSurfaceVariant,
                 ),
@@ -239,14 +240,11 @@ class DeviceNotificationsSheetState extends State<DeviceNotificationsSheet> {
                         deviceTypeLabel:
                         formatDeviceType(item.deviceType),
                         deviceIcon: deviceIcon(item.deviceType),
-                        incidentTitle:
-                        incidentTitle(item.type, item.severity),
-                        incidentIcon:
-                        incidentIcon(item.type, item.severity),
+                        incidentTitle: incidentTitle(item.type, item.severity),
+                        incidentIcon: incidentIcon(item.type, item.severity),
                         incidentAccentColor: incidentAccentColor(item.type, item.severity, cs),
                         formattedDate: formatDate(item.createdAt),
-                        onAcknowledge: () =>
-                            acknowledgeIncident(item.id),
+                        onAcknowledge: () => acknowledgeIncident(item.id),
                       );
                     }
 
@@ -455,7 +453,8 @@ class IncidentNotificationCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            item.message.trim().isEmpty ? 'Se ha registrado una incidencia de seguridad en el dispositivo.' : item.message,
+            item.message.trim().isEmpty ?
+            'Se ha registrado una incidencia de seguridad en el dispositivo.' : item.message,
             style: TextStyle(color: cs.onSurface),
           ),
           const SizedBox(height: 14),
@@ -481,20 +480,63 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final hasError = errorMessage?.trim().isNotEmpty == true;
+
+    final accentColor = hasError ? cs.error : cs.primary;
+    final icon = hasError ? Icons.error_outline_rounded
+        : Icons.notifications_none_rounded;
+    final title = hasError ? 'No se pudieron cargar las notificaciones' : 'Todo al día';
+    final subtitle = hasError ? errorMessage!
+        : 'No tienes notificaciones pendientes en este momento. Cuando llegue una nueva, aparecerá aquí automáticamente.';
 
     return Center(
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
-          border: Border.all(color: cs.outlineVariant),
+          borderRadius: BorderRadius.circular(24),
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.42),
+          border: Border.all(
+            color: hasError
+                ? cs.error.withValues(alpha: 0.24)
+                : cs.outlineVariant,
+          ),
         ),
-        child: Text(
-          errorMessage?.isNotEmpty == true ? errorMessage! : 'No tienes notificaciones pendientes.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: cs.onSurfaceVariant),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: accentColor.withValues(alpha: 0.12),
+              ),
+              child: Icon(
+                icon,
+                color: accentColor,
+                size: 28,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+          ],
         ),
       ),
     );
