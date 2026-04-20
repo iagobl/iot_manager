@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
 import 'package:iot_manager/features/devices/data/repositories/devices_repository_impl.dart';
@@ -39,10 +41,13 @@ class HomeController extends ChangeNotifier {
   bool creatingHome = false;
   String? deletingId;
 
+  int loadVersion = 0;
+
   List<HomeSummary> get homes => overview?.homes ?? <HomeSummary>[];
   List<DeviceItem> get devices => overview?.devices ?? <DeviceItem>[];
 
   Future<void> load({bool silent = false}) async {
+    final currentLoadVersion = ++loadVersion;
     final hasData = overview != null;
 
     if (silent && hasData) {
@@ -56,38 +61,66 @@ class HomeController extends ChangeNotifier {
 
     try {
       final data = await homeRepo.getOverview();
+
+      if (currentLoadVersion != loadVersion) return;
+
       overview = data;
       firstName = data.firstName;
-      await calculateStats(data);
+
+      calculateBaseStats(data);
+
+      loading = false;
+      refreshing = false;
+      notifyListeners();
+
+      unawaited(calculateActiveDevicesInBackground(data, currentLoadVersion));
     } catch (e) {
+      if (currentLoadVersion != loadVersion) return;
       errorMessage = e.toString();
-    } finally {
       loading = false;
       refreshing = false;
       notifyListeners();
     }
   }
 
-  Future<void> refresh() async {
-    await load(silent: true);
+  Future<void> refresh({bool showOverlay = true}) async {
+    await load(silent: showOverlay);
   }
 
-  Future<void> calculateStats(HomeOverview data) async {
+  void calculateBaseStats(HomeOverview data) {
     totalHomes = data.homes.length;
     totalDevices = data.devices.length;
-    activeDevices = 0;
     totalTodayWh = 0;
+    activeDevices = 0;
 
     for (final device in data.devices) {
       totalTodayWh += device.energyTodayWh;
+    }
+  }
+
+  Future<void> calculateActiveDevicesInBackground(
+      HomeOverview data,
+      int loadVersion,
+      ) async {
+    int computedActiveDevices = 0;
+
+    for (final device in data.devices) {
+      if (loadVersion != this.loadVersion) return;
 
       try {
-        final isActive = await _deviceRepo.isDeviceActive(device);
+        final isActive = await _deviceRepo.isDeviceActive(device)
+            .timeout(const Duration(seconds: 2));
+
         if (isActive) {
-          activeDevices++;
+          computedActiveDevices++;
         }
       } catch (_) {}
     }
+
+    if (loadVersion != this.loadVersion) return;
+
+    activeDevices = computedActiveDevices;
+    notifyListeners();
   }
 
   int getDeviceCountForHome(String homeId) {

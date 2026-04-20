@@ -22,7 +22,7 @@ class HomePageState extends State<HomePage> {
   late final HomeController controller;
 
   Future<void> refreshFromTabReselect() async {
-    await controller.refresh();
+    await controller.refresh(showOverlay: true);
   }
 
   @override
@@ -181,7 +181,7 @@ class HomePageState extends State<HomePage> {
     return Stack(
       children: [
         RefreshIndicator(
-          onRefresh: controller.refresh,
+          onRefresh: () => controller.refresh(showOverlay: false),
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 110),
@@ -272,16 +272,14 @@ class HomePageState extends State<HomePage> {
                   subtitle: HomeStrings.warningNewHome,
                   icon: Icons.home_outlined,
                   actionLabel: HomeStrings.newHome,
-                  onAction:
-                  controller.creatingHome ? null : showCreateHomeDialog,
+                  onAction: controller.creatingHome ? null : showCreateHomeDialog,
                 ) : Column(
                   children: controller.homes.map((home) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: GestureDetector(
                         onTap: () {
                           Navigator.push(context,
-                            MaterialPageRoute(builder: (_) => HomeDetailPage(home: home),
-                            ),
+                            MaterialPageRoute(builder: (_) => HomeDetailPage(home: home)),
                           );
                         },
                         child: HomeSummaryCard(
