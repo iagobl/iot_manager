@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "107501518049",
+    "project_id": "iot-manager-80faf",
+    "storage_bucket": "iot-manager-80faf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:107501518049:android:fcc69562a5bba508e2cba0",
+        "android_client_info": {
+          "package_name": "com.iagobecerralopez.tfg.iot_manager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBIPaMDavj8aTMaPQU5ZlkzUmn0MmDX0V0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
