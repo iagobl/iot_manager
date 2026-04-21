@@ -2,15 +2,29 @@ import 'package:flutter/foundation.dart';
 import 'package:iot_manager/core/error/app_exception.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
+import 'package:iot_manager/features/devices/data/repositories/devices_repository_impl.dart';
+import 'package:iot_manager/features/devices/domain/usecases/delete_automation.dart';
+import 'package:iot_manager/features/devices/domain/usecases/fetch_automations.dart';
+import 'package:iot_manager/features/devices/domain/usecases/upsert_automation.dart';
 
 class DeviceTimerController extends ChangeNotifier {
   DeviceTimerController({
     required this.deviceId,
-    required this.remoteDatasource,
-  });
+    required DevicesRemoteDatasource remoteDatasource,
+  })  : fetchAutomations = FetchAutomations(
+    DevicesRepositoryImpl(remoteDatasource),
+  ),
+        upsertAutomation = UpsertAutomation(
+          DevicesRepositoryImpl(remoteDatasource),
+        ),
+        deleteAutomation = DeleteAutomation(
+          DevicesRepositoryImpl(remoteDatasource),
+        );
 
   final String deviceId;
-  final DevicesRemoteDatasource remoteDatasource;
+  final FetchAutomations fetchAutomations;
+  final UpsertAutomation upsertAutomation;
+  final DeleteAutomation deleteAutomation;
 
   bool loading = false;
   bool busy = false;
@@ -23,7 +37,7 @@ class DeviceTimerController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      timers = await remoteDatasource.fetchAutomations(
+      timers = await fetchAutomations(
         deviceId: deviceId,
         type: 'timer',
       );
@@ -53,7 +67,7 @@ class DeviceTimerController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await remoteDatasource.upsertAutomation(
+      await upsertAutomation(
         deviceId: deviceId,
         type: 'timer',
         enabled: false,
@@ -84,7 +98,7 @@ class DeviceTimerController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await remoteDatasource.deleteAutomation(automationId);
+      await deleteAutomation(automationId);
       await load();
     } catch (err) {
       final failure = ErrorMapper.mapFailure(err);
@@ -114,7 +128,7 @@ class DeviceTimerController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await remoteDatasource.upsertAutomation(
+      await upsertAutomation(
         id: id,
         deviceId: deviceId,
         type: 'timer',
@@ -170,7 +184,7 @@ class DeviceTimerController extends ChangeNotifier {
           'started_at': null,
         };
 
-        await remoteDatasource.upsertAutomation(
+        await upsertAutomation(
           id: id,
           deviceId: deviceId,
           type: 'timer',

@@ -8,7 +8,8 @@ import 'package:iot_manager/features/devices/presentation/widgets/sections/devic
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_info_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_light_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_power_panel.dart';
-import 'package:iot_manager/features/devices/presentation/widgets/sections/device_safety_section.dart';
+import 'package:iot_manager/features/devices/presentation/widgets/sections/device_safety_section.dart'
+as safety_section;
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_schedules_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_settings_section.dart';
 import 'package:iot_manager/features/devices/presentation/widgets/sections/device_share_section.dart';
@@ -169,7 +170,7 @@ class DevicePanelPageState extends State<DevicePanelPage> {
     }
 
     if (selectedSection == DevicePanelSection.safety) {
-      return DeviceSafetySection(
+      return safety_section.DeviceSafetySection(
         host: widget.device.identifier,
       );
     }

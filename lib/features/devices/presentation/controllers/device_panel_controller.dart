@@ -5,18 +5,32 @@ import 'package:iot_manager/core/constants/devices_panel_strings.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
 import 'package:iot_manager/core/iot/shelly/shelly_rpc_client.dart';
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
+import 'package:iot_manager/features/devices/data/repositories/devices_repository_impl.dart';
 import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
+import 'package:iot_manager/features/devices/domain/usecases/get_latest_active_incident.dart';
+import 'package:iot_manager/features/devices/domain/usecases/insert_incident.dart';
+import 'package:iot_manager/features/devices/domain/usecases/update_device_state.dart';
 
 class DevicePanelController extends ChangeNotifier {
   DevicePanelController({
     required this.device,
     DevicesRemoteDatasource? remoteDatasource,
     ShellyRpcClient? rpcClient,
-  })  : remoteDatasource = remoteDatasource ?? DevicesRemoteDatasource(),
+  })  : getLatestActiveIncident = GetLatestActiveIncident(
+    DevicesRepositoryImpl(remoteDatasource ?? DevicesRemoteDatasource()),
+  ),
+        updateDeviceStateUseCase = UpdateDeviceState(
+          DevicesRepositoryImpl(remoteDatasource ?? DevicesRemoteDatasource()),
+        ),
+        insertIncidentUseCase = InsertIncident(
+          DevicesRepositoryImpl(remoteDatasource ?? DevicesRemoteDatasource()),
+        ),
         rpcClient = rpcClient ?? ShellyRpcClient(host: device.identifier);
 
   final DeviceItem device;
-  final DevicesRemoteDatasource remoteDatasource;
+  final GetLatestActiveIncident getLatestActiveIncident;
+  final UpdateDeviceState updateDeviceStateUseCase;
+  final InsertIncident insertIncidentUseCase;
   final ShellyRpcClient rpcClient;
 
   bool _loading = false;
@@ -31,9 +45,6 @@ class DevicePanelController extends ChangeNotifier {
   double _energyTodayWh = 0;
   double _frequencyHz = 0;
 
-  double _lastOnPowerW = 0;
-  double _lastOnVoltageV = 0;
-  double _lastOnCurrentA = 0;
 
   bool _manualPowerOffInProgress = false;
   bool _autoShutdownIncidentRecorded = false;
@@ -77,115 +88,160 @@ class DevicePanelController extends ChangeNotifier {
   int get rssi => _rssi;
   int get uptimeSeconds => _uptimeSeconds;
 
-  String get signalQuality {
-    if (_rssi == 0) return DevicesPanelStrings.notData;
-    if (_rssi >= -60) return DevicesPanelStrings.excellent;
-    if (_rssi >= -70) return DevicesPanelStrings.good;
-    if (_rssi >= -80) return DevicesPanelStrings.regular;
-    return DevicesPanelStrings.bad;
-  }
-
-  String get uptimeLabel {
-    if (_uptimeSeconds <= 0) return '-';
-
-    final totalMinutes = _uptimeSeconds ~/ 60;
-    final days = totalMinutes ~/ (24 * 60);
-    final hours = (totalMinutes % (24 * 60)) ~/ 60;
-    final minutes = totalMinutes % 60;
-
-    if (days > 0) {
-      if (hours > 0) return '${days}d ${hours}h';
-      return '${days}d';
-    }
-
-    if (hours > 0) {
-      if (minutes > 0) return '${hours}h ${minutes}min';
-      return '${hours}h';
-    }
-
-    return '${minutes}min';
-  }
-
   Future<void> initialize() async {
-    await refresh();
-    startPolling();
+    await init();
   }
 
-  Future<void> refresh() async {
-    if (_loading) return;
-
-    setLoading(true);
-    clearError(notify: false);
+  Future<void> init() async {
+    _loading = true;
+    _errorMessage = null;
+    notifyListeners();
 
     try {
-      final switchStatus = await rpcClient.getSwitchStatus();
-      final deviceInfo = await rpcClient.getDeviceInfo();
-      final wifiStatus = await rpcClient.getWifiStatus();
-      final systemStatus = await rpcClient.getSystemStatus();
-
-      applySwitchStatus(switchStatus);
-      applyDeviceInfo(deviceInfo);
-      applyWifiStatus(wifiStatus);
-      applySystemStatus(systemStatus);
-
-      if (_energyTodayWh <= 0) {
-        _energyTodayWh = device.energyTodayWh;
-      }
-
-      _errorMessage = null;
-      notifyListeners();
+      await _refresh();
+      startPolling();
     } catch (error) {
       final failure = ErrorMapper.mapFailure(error);
       _errorMessage = failure.message;
       notifyListeners();
     } finally {
-      setLoading(false);
+      _loading = false;
+      notifyListeners();
     }
+  }
+
+  Future<void> refresh() async {
+    await _refresh();
+  }
+
+  Future<void> refreshNow() async {
+    _loading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _refresh();
+    } catch (error) {
+      final failure = ErrorMapper.mapFailure(error);
+      _errorMessage = failure.message;
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _refresh() async {
+    final switchStatus = await rpcClient.getSwitchStatus();
+    final sysStatus = await rpcClient.call('Sys.GetStatus');
+    final wifiStatus = await rpcClient.call('WiFi.GetStatus');
+    final switchConfig = await rpcClient.call('Switch.GetConfig', params: {'id': 0});
+
+    final output = switchStatus['output'] == true;
+    final power = toDouble(switchStatus['apower']) ?? 0;
+    final voltage = toDouble(switchStatus['voltage']) ?? 0;
+    final current = toDouble(switchStatus['current']) ?? 0;
+    final temperature = toDouble(
+      (switchStatus['temperature'] is Map)
+          ? switchStatus['temperature']['tC']
+          : null,
+    ) ??
+        0;
+    final energyToday = toDouble(
+      (switchStatus['aenergy'] is Map)
+          ? switchStatus['aenergy']['total']
+          : null,
+    ) ??
+        0;
+    final freq = toDouble(switchStatus['freq']) ?? 0;
+
+    _isOn = output;
+    _powerW = power;
+    _voltageV = voltage;
+    _currentA = current;
+    _temperatureC = temperature;
+    _energyTodayWh = energyToday;
+    _frequencyHz = freq;
+
+    if (output) {
+    }
+
+    _deviceHost = device.identifier;
+    _deviceIp = (wifiStatus['sta_ip'] ?? switchStatus['src'] ?? '-').toString();
+    _macAddress = (sysStatus['mac'] ?? '-').toString();
+    _firmwareVersion =
+        (sysStatus['ver'] ?? sysStatus['fw_id'] ?? '-').toString();
+    _deviceModel = (sysStatus['model'] ?? sysStatus['device'] ?? '-').toString();
+    _hasPendingUpdate = sysStatus['available_updates'] != null;
+    _needsReboot = sysStatus['restart_required'] == true;
+
+    _ssid = (wifiStatus['ssid'] ?? DevicesPanelStrings.notData).toString();
+    _rssi = toInt(wifiStatus['rssi']) ?? 0;
+    _uptimeSeconds = toInt(sysStatus['uptime']) ?? 0;
+
+    await _checkIfThereIsActiveIncident();
+    await _handleSafetyAutoShutdownIfNeeded(
+      switchConfig: switchConfig,
+      output: output,
+      power: power,
+      voltage: voltage,
+      current: current,
+    );
+
+    notifyListeners();
+  }
+
+  Future<void> _checkIfThereIsActiveIncident() async {
+    try {
+      final latestIncident = await getLatestActiveIncident(device.id);
+
+      if (latestIncident == null) {
+        _autoShutdownIncidentRecorded = false;
+        _lastAutoShutdownKey = null;
+        return;
+      }
+
+      final type = (latestIncident['type'] ?? '').toString();
+      final status = (latestIncident['status'] ?? '').toString();
+
+      if (status == 'active' &&
+          (type == 'max_power_exceeded' ||
+              type == 'max_voltage_exceeded' ||
+              type == 'max_current_exceeded')) {
+        _autoShutdownIncidentRecorded = true;
+        _lastAutoShutdownKey = type;
+      } else {
+        _autoShutdownIncidentRecorded = false;
+        _lastAutoShutdownKey = null;
+      }
+    } catch (_) {}
   }
 
   Future<void> togglePower() async {
     if (_busyPowerAction) return;
 
     _busyPowerAction = true;
+    _errorMessage = null;
     notifyListeners();
 
-    final nextValue = !_isOn;
-
     try {
-      if (nextValue) {
-        final blockedFailure = await getCurrentSafetyBlockFailure();
-        if (blockedFailure != null) {
-          _errorMessage = blockedFailure.message;
-          notifyListeners();
-          return;
-        }
-
-        final activeIncident =
-        await remoteDatasource.getLatestActiveIncident(device.id);
-
-        if (activeIncident != null && isSpecificBlockingIncident(activeIncident)) {
-          final failure = ErrorMapper.mapFailure(
-            Exception(mapIncidentTypeToErrorKey(activeIncident)),
-          );
-          _errorMessage = failure.message;
-          notifyListeners();
-          return;
-        }
-
-        _autoShutdownIncidentRecorded = false;
-        _lastAutoShutdownKey = null;
-      } else {
-        _manualPowerOffInProgress = true;
-      }
+      final nextValue = !_isOn;
 
       await rpcClient.setSwitch(on: nextValue);
-      await remoteDatasource.updateDeviceState(device.id, nextValue);
+      await updateDeviceStateUseCase(device.id, nextValue);
 
       _isOn = nextValue;
-      _errorMessage = null;
-      notifyListeners();
 
-      await refresh();
+      if (!nextValue) {
+        _manualPowerOffInProgress = true;
+        _powerW = 0;
+        _voltageV = 0;
+        _currentA = 0;
+        _temperatureC = 0;
+        _frequencyHz = 0;
+      }
+
+      notifyListeners();
+      await _refresh();
     } catch (error) {
       final failure = ErrorMapper.mapFailure(error);
       _errorMessage = failure.message;
@@ -197,465 +253,131 @@ class DevicePanelController extends ChangeNotifier {
     }
   }
 
-  Future<SafetyBlockResult?> getCurrentSafetyBlockFailure() async {
+  Future<void> _handleSafetyAutoShutdownIfNeeded({
+    required Map<String, dynamic> switchConfig,
+    required bool output,
+    required double power,
+    required double voltage,
+    required double current,
+  }) async {
+    if (!output) {
+      if (_manualPowerOffInProgress) {
+        _autoShutdownIncidentRecorded = false;
+        _lastAutoShutdownKey = null;
+      }
+      return;
+    }
+
+    final powerLimit = toDouble(switchConfig['power_limit']);
+    final voltageLimit = toDouble(switchConfig['voltage_limit']);
+    final currentLimit = toDouble(switchConfig['current_limit']);
+
+    String? incidentType;
+    String? incidentMessage;
+    double? triggerValue;
+
+    if (powerLimit != null && powerLimit > 0 && power > powerLimit) {
+      incidentType = 'max_power_exceeded';
+      incidentMessage =
+      'El dispositivo se apagó automáticamente por superar el límite de potencia.';
+      triggerValue = power;
+    } else if (voltageLimit != null &&
+        voltageLimit > 0 &&
+        voltage > voltageLimit) {
+      incidentType = 'max_voltage_exceeded';
+      incidentMessage =
+      'El dispositivo se apagó automáticamente por superar el límite de voltaje.';
+      triggerValue = voltage;
+    } else if (currentLimit != null &&
+        currentLimit > 0 &&
+        current > currentLimit) {
+      incidentType = 'max_current_exceeded';
+      incidentMessage =
+      'El dispositivo se apagó automáticamente por superar el límite de corriente.';
+      triggerValue = current;
+    }
+
+    if (incidentType == null || incidentMessage == null || triggerValue == null) {
+      return;
+    }
+
+    if (_autoShutdownIncidentRecorded &&
+        _lastAutoShutdownKey == incidentType &&
+        !_manualPowerOffInProgress) {
+      return;
+    }
+
     try {
-      final switchStatus = await rpcClient.getSwitchStatus();
-      final config = await rpcClient.call('Switch.GetConfig', params: {'id': 0});
+      await rpcClient.setSwitch(on: false);
 
-      final currentVoltage = readDouble(switchStatus, const ['voltage']);
-      final currentPower = readDouble(switchStatus, const ['apower', 'power']);
-
-      final rawCurrent = readDouble(switchStatus, const ['current']);
-      final currentCurrent = normalizeCurrentA(
-        rawCurrent: rawCurrent,
-        powerW: currentPower,
-        voltageV: currentVoltage,
+      await insertIncidentUseCase(
+        deviceId: device.id,
+        type: incidentType,
+        message: incidentMessage,
+        severity: 3,
       );
 
-      final voltageLimit = _toDouble(config['voltage_limit']);
-      final powerLimit = _toDouble(config['power_limit']);
-      final currentLimit = _toDouble(config['current_limit']);
+      await updateDeviceStateUseCase(device.id, false);
 
-      if (voltageLimit != null &&
-          voltageLimit > 0 &&
-          currentVoltage > 0 &&
-          currentVoltage > voltageLimit) {
-        return SafetyBlockResult(
-          type: 'overvoltage',
-          message: ErrorMapper.mapFailure(Exception('overvoltage')).message,
-        );
-      }
+      _isOn = false;
+      _powerW = 0;
+      _voltageV = 0;
+      _currentA = 0;
+      _temperatureC = 0;
+      _frequencyHz = 0;
 
-      if (powerLimit != null &&
-          powerLimit > 0 &&
-          currentPower > 0 &&
-          currentPower > powerLimit) {
-        return SafetyBlockResult(
-          type: 'overpower',
-          message: ErrorMapper.mapFailure(Exception('overpower')).message,
-        );
-      }
+      _autoShutdownIncidentRecorded = true;
+      _lastAutoShutdownKey = incidentType;
 
-      if (currentLimit != null &&
-          currentLimit > 0 &&
-          currentCurrent > 0 &&
-          currentCurrent > currentLimit) {
-        return SafetyBlockResult(
-          type: 'overcurrent',
-          message: ErrorMapper.mapFailure(Exception('overcurrent')).message,
-        );
-      }
-
-      return null;
-    } catch (error) {
-      final failure = ErrorMapper.mapFailure(error);
-      _errorMessage = failure.message;
       notifyListeners();
-      return null;
-    }
-  }
-
-  bool isSpecificBlockingIncident(Map<String, dynamic> incident) {
-    final type = (incident['type'] ?? '').toString().toLowerCase().trim();
-
-    return type.contains('overvoltage') ||
-        type.contains('voltage') ||
-        type.contains('overpower') ||
-        type.contains('power') ||
-        type.contains('overcurrent') ||
-        type.contains('current') ||
-        type.contains('overtemperature') ||
-        type.contains('temperature');
+    } catch (_) {}
   }
 
   void startPolling() {
     pollTimer?.cancel();
-    pollTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
-      try {
-        final switchStatus = await rpcClient.getSwitchStatus();
-
-        if (!(_hasPendingUpdate || _needsReboot)) {
-          final deviceInfo = await rpcClient.getDeviceInfo();
-          applyDeviceInfo(deviceInfo);
-        }
-
-        applySwitchStatus(switchStatus);
-
-        if (DateTime.now().second % 20 == 0) {
-          final wifiStatus = await rpcClient.getWifiStatus();
-          final systemStatus = await rpcClient.getSystemStatus();
-          applyWifiStatus(wifiStatus);
-          applySystemStatus(systemStatus);
-        }
-
-        _errorMessage = null;
-        notifyListeners();
-      } catch (_) {}
-    });
+    pollTimer = Timer.periodic(
+      const Duration(seconds: 2),
+          (_) => unawaited(refreshSilently()),
+    );
   }
 
-  void applySwitchStatus(Map<String, dynamic> switchStatus) {
-    final wasOn = _isOn;
-
-    _isOn = readBool(switchStatus, const ['output']);
-    _powerW = readDouble(switchStatus, const ['apower', 'power']);
-    _voltageV = readDouble(switchStatus, const ['voltage']);
-
-    final rawCurrent = readDouble(switchStatus, const ['current']);
-    _currentA = normalizeCurrentA(
-      rawCurrent: rawCurrent,
-      powerW: _powerW,
-      voltageV: _voltageV,
-    );
-
-    _temperatureC = readTemperatureC(switchStatus);
-
-    final parsedEnergy = readDouble(
-      switchStatus,
-      const ['aenergy.total', 'energy.total', 'aenergy.by_minute'],
-    );
-    if (parsedEnergy > 0) {
-      _energyTodayWh = parsedEnergy;
-    }
-
-    _frequencyHz = readDouble(switchStatus, const ['freq', 'frequency']);
-
-    if (_isOn) {
-      _lastOnPowerW = _powerW;
-      _lastOnVoltageV = _voltageV;
-      _lastOnCurrentA = _currentA;
-      _autoShutdownIncidentRecorded = false;
-      _lastAutoShutdownKey = null;
-    }
-
-    if (wasOn && !_isOn && !_manualPowerOffInProgress) {
-      unawaited(recordAutomaticShutdownIncidentIfNeeded());
-    }
-  }
-
-  Future<void> recordAutomaticShutdownIncidentIfNeeded() async {
-    if (_autoShutdownIncidentRecorded) return;
+  Future<void> refreshSilently() async {
+    if (_loading || _busyPowerAction) return;
 
     try {
-      final config = await rpcClient.call(
-        'Switch.GetConfig',
-        params: {'id': 0},
-      );
-
-      final incident = buildAutomaticShutdownIncident(config);
-      final incidentKey = incident['key']?.toString();
-
-      if (incidentKey == null || incidentKey.isEmpty) return;
-      if (_lastAutoShutdownKey == incidentKey) return;
-
-      await remoteDatasource.insertIncident(
-        deviceId: device.id,
-        type: incident['type']!.toString(),
-        message: incident['message']!.toString(),
-        severity: incident['severity'] as int? ?? 3,
-      );
-
-      await remoteDatasource.updateDeviceState(device.id, false);
-
-      _isOn = false;
-      _autoShutdownIncidentRecorded = true;
-      _lastAutoShutdownKey = incidentKey;
-      notifyListeners();
-    } catch (error) {
-      final failure = ErrorMapper.mapFailure(error);
-      _errorMessage = failure.message;
-      notifyListeners();
-    }
+      await _refresh();
+    } catch (_) {}
   }
 
-  Map<String, Object> buildAutomaticShutdownIncident(
-      Map<String, dynamic> config,
-      ) {
-    final voltageLimit = _toDouble(config['voltage_limit']);
-    final powerLimit = _toDouble(config['power_limit']);
-    final currentLimit = _toDouble(config['current_limit']);
-
-    if (voltageLimit != null &&
-        voltageLimit > 0 &&
-        _lastOnVoltageV > voltageLimit) {
-      return {
-        'key':
-        'overvoltage:${_formatNumber(_lastOnVoltageV)}:${_formatNumber(voltageLimit)}',
-        'type': 'overvoltage',
-        'message':
-        'El dispositivo se apagó automáticamente porque la tensión alcanzó ${_formatNumber(_lastOnVoltageV)} V y superó el límite configurado de ${_formatNumber(voltageLimit)} V.',
-        'severity': 3,
-      };
-    }
-
-    if (powerLimit != null && powerLimit > 0 && _lastOnPowerW > powerLimit) {
-      return {
-        'key':
-        'overpower:${_formatNumber(_lastOnPowerW)}:${_formatNumber(powerLimit)}',
-        'type': 'overpower',
-        'message':
-        'El dispositivo se apagó automáticamente porque la potencia alcanzó ${_formatNumber(_lastOnPowerW)} W y superó el límite configurado de ${_formatNumber(powerLimit)} W.',
-        'severity': 3,
-      };
-    }
-
-    if (currentLimit != null &&
-        currentLimit > 0 &&
-        _lastOnCurrentA > currentLimit) {
-      return {
-        'key':
-        'overcurrent:${_formatNumber(_lastOnCurrentA)}:${_formatNumber(currentLimit)}',
-        'type': 'overcurrent',
-        'message':
-        'El dispositivo se apagó automáticamente porque la corriente alcanzó ${_formatNumber(_lastOnCurrentA)} A y superó el límite configurado de ${_formatNumber(currentLimit)} A.',
-        'severity': 3,
-      };
-    }
-
-    return {
-      'key': 'safety_shutdown',
-      'type': 'safety_shutdown',
-      'message':
-      'El dispositivo se apagó automáticamente por una condición de seguridad.',
-      'severity': 3,
-    };
-  }
-
-  String mapIncidentTypeToErrorKey(Map<String, dynamic> incident) {
-    final type = (incident['type'] ?? '').toString().toLowerCase().trim();
-
-    if (type.contains('overvoltage') || type.contains('voltage')) {
-      return 'overvoltage';
-    }
-
-    if (type.contains('overpower') || type.contains('power')) {
-      return 'overpower';
-    }
-
-    if (type.contains('overcurrent') || type.contains('current')) {
-      return 'overcurrent';
-    }
-
-    if (type.contains('temperature')) {
-      return 'overtemperature';
-    }
-
-    return 'device_blocked_by_incidents';
-  }
-
-  void applyDeviceInfo(Map<String, dynamic> deviceInfo) {
-    _deviceHost = device.identifier.trim().isEmpty ? '-' : device.identifier;
-
-    _deviceIp = readString(
-      deviceInfo,
-      const ['ip', 'ipv4', 'wifi.sta_ip', 'wifi.ip'],
-    );
-
-    _macAddress = readString(
-      deviceInfo,
-      const ['mac', 'mac_address'],
-    );
-
-    _firmwareVersion = readString(
-      deviceInfo,
-      const ['ver', 'version', 'fw_id', 'fw'],
-    );
-
-    _deviceModel = readString(
-      deviceInfo,
-      const ['model', 'name', 'type'],
-    );
-
-    _hasPendingUpdate = readBool(
-      deviceInfo,
-      const [
-        'update.available',
-        'update.has_update',
-        'updates.available',
-        'has_update',
-      ],
-    );
-
-    _needsReboot = readBool(
-      deviceInfo,
-      const [
-        'reboot_required',
-        'restart_required',
-        'update.needs_reboot',
-      ],
-    );
-  }
-
-  void applyWifiStatus(Map<String, dynamic> wifiStatus) {
-    final parsedSsid = readString(
-      wifiStatus,
-      const [
-        'sta.ssid',
-        'wifi.sta.ssid',
-        'ssid',
-      ],
-    );
-    _ssid = parsedSsid == '-' ? 'Sin datos' : parsedSsid;
-
-    final parsedRssi = readInt(
-      wifiStatus,
-      const [
-        'sta.rssi',
-        'wifi.sta.rssi',
-        'rssi',
-      ],
-    );
-    _rssi = parsedRssi;
-  }
-
-  void applySystemStatus(Map<String, dynamic> systemStatus) {
-    _uptimeSeconds = 0;
-
-    final uptime = readNestedValue(systemStatus, 'uptime');
-    if (uptime is num) {
-      _uptimeSeconds = uptime.toInt();
-      return;
-    }
-
-    final nestedUptime = readNestedValue(systemStatus, 'sys.uptime');
-    if (nestedUptime is num) {
-      _uptimeSeconds = nestedUptime.toInt();
-    }
-  }
-
-  String readString(Map<String, dynamic> source, List<String> keys) {
-    for (final key in keys) {
-      final value = readNestedValue(source, key);
-
-      if (value == null) continue;
-
-      final text = value.toString().trim();
-      if (text.isNotEmpty) return text;
-    }
-
-    return '-';
-  }
-
-  bool readBool(Map<String, dynamic> source, List<String> keys) {
-    for (final key in keys) {
-      final value = readNestedValue(source, key);
-
-      if (value is bool) return value;
-      if (value is num) return value != 0;
-
-      if (value is String) {
-        final normalized = value.toLowerCase().trim();
-        if (normalized == 'true' || normalized == 'on') return true;
-        if (normalized == 'false' || normalized == 'off') return false;
-      }
-    }
-    return false;
-  }
-
-  double readDouble(Map<String, dynamic> source, List<String> keys) {
-    for (final key in keys) {
-      final value = readNestedValue(source, key);
-
-      if (value is num) return value.toDouble();
-
-      if (value is List && value.isNotEmpty) {
-        final first = value.first;
-        if (first is num) return first.toDouble();
-      }
-
-      if (value is String) {
-        final parsed = double.tryParse(value.replaceAll(',', '.'));
-        if (parsed != null) return parsed;
-      }
-    }
-    return 0;
-  }
-
-  int readInt(Map<String, dynamic> source, List<String> keys) {
-    for (final key in keys) {
-      final value = readNestedValue(source, key);
-
-      if (value is int) return value;
-      if (value is num) return value.toInt();
-
-      if (value is String) {
-        final parsed = int.tryParse(value.trim());
-        if (parsed != null) return parsed;
-      }
-    }
-    return 0;
-  }
-
-  double readTemperatureC(Map<String, dynamic> source) {
-    final nested = readNestedValue(source, 'temperature.tC');
-    if (nested is num) return nested.toDouble();
-
-    final single = readNestedValue(source, 'temperature');
-    if (single is num) return single.toDouble();
-
-    return 0;
-  }
-
-  double normalizeCurrentA({
-    required double rawCurrent,
-    required double powerW,
-    required double voltageV,
-  }) {
-    if (rawCurrent > 0) {
-      return rawCurrent;
-    }
-
-    if (powerW > 0 && voltageV > 0) {
-      final estimated = powerW / voltageV;
-
-      if (estimated.isFinite && estimated > 0) {
-        return estimated;
-      }
-    }
-
-    return 0;
-  }
-
-  dynamic readNestedValue(Map<String, dynamic> source, String path) {
-    dynamic current = source;
-
-    for (final part in path.split('.')) {
-      if (current is Map<String, dynamic> && current.containsKey(part)) {
-        current = current[part];
-      } else {
-        return null;
-      }
-    }
-
-    return current;
-  }
-
-  double? _toDouble(dynamic value) {
+  double? toDouble(dynamic value) {
     if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
+  }
 
-    if (value is String) {
-      return double.tryParse(value.replaceAll(',', '.'));
+  int? toInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  String get signalQuality {
+    if (_rssi >= -55) return 'Excelente';
+    if (_rssi >= -67) return 'Buena';
+    if (_rssi >= -75) return 'Aceptable';
+    if (_rssi >= -85) return 'Débil';
+    return 'Muy débil';
+  }
+
+  String get uptimeLabel {
+    final totalSeconds = _uptimeSeconds;
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+
+    if (hours <= 0) {
+      return '$minutes min';
     }
 
-    return null;
-  }
-
-  String _formatNumber(double value) {
-    if (value == value.roundToDouble()) {
-      return value.toInt().toString();
-    }
-
-    return value.toStringAsFixed(1);
-  }
-
-  void setLoading(bool value) {
-    _loading = value;
-    notifyListeners();
-  }
-
-  void clearError({bool notify = true}) {
-    _errorMessage = null;
-    if (notify) notifyListeners();
+    return '$hours h $minutes min';
   }
 
   @override
@@ -663,14 +385,4 @@ class DevicePanelController extends ChangeNotifier {
     pollTimer?.cancel();
     super.dispose();
   }
-}
-
-class SafetyBlockResult {
-  const SafetyBlockResult({
-    required this.type,
-    required this.message,
-  });
-
-  final String type;
-  final String message;
 }

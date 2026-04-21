@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
 import 'package:iot_manager/features/devices/presentation/controllers/device_charts_controller.dart';
@@ -106,6 +108,13 @@ class DeviceChartsSectionState extends State<DeviceChartsSection>
     super.build(context);
 
     final data = controller.chartData;
+    final title = chartCardTitle(controller.metric);
+    final subtitle = chartCardSubtitle(
+      range: controller.range,
+      start: data.axisStart,
+      end: data.axisEnd,
+    );
+    final total = chartCardTotal(data);
 
     return RefreshIndicator(
       onRefresh: onRefresh,
@@ -140,10 +149,10 @@ class DeviceChartsSectionState extends State<DeviceChartsSection>
                   child: LinearProgressIndicator(minHeight: 2),
                 ),
               ChartSummaryCard(
-                title: data.title,
-                subtitle: data.subtitle,
+                title: title,
+                subtitle: subtitle,
                 unit: data.unit,
-                total: data.total,
+                total: total,
                 average: data.average,
                 min: data.min,
                 max: data.max,
@@ -254,7 +263,7 @@ class ChartsHeroHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Expanded(
+              const Expanded(
                 child: HeaderChip(
                   icon: Icons.sync_rounded,
                   label: 'Automaticamente',
@@ -553,11 +562,11 @@ class ChartSummaryCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String unit;
-  final double? total;
-  final double? average;
-  final double? min;
-  final double? max;
-  final double? latestValue;
+  final double total;
+  final double average;
+  final double min;
+  final double max;
+  final double latestValue;
   final bool isConsumption;
 
   @override
@@ -791,6 +800,12 @@ class LineChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final title = chartCardTitle(metric);
+    final subtitle = chartCardSubtitle(
+      range: range,
+      start: data.axisStart,
+      end: data.axisEnd,
+    );
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -821,7 +836,7 @@ class LineChartCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(data.title,
+                      Text(title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -831,7 +846,7 @@ class LineChartCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(data.subtitle,
+                      Text(subtitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -854,11 +869,9 @@ class LineChartCard extends StatelessWidget {
                     color: scheme.surfaceContainerLowest,
                   ),
                   child: CustomPaint(
-                    painter: AdvancedLinePainter(
+                    painter: SimpleLineChartPainter(
                       data: data,
-                      drawHeader: false,
-                      pdfMode: false,
-                      showXAxisLabels: false,
+                      scheme: scheme,
                     ),
                     child: const SizedBox.expand(),
                   ),
@@ -870,14 +883,14 @@ class LineChartCard extends StatelessWidget {
             : Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(data.title,
+            Text(title,
               style: const TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 18,
               ),
             ),
             const SizedBox(height: 4),
-            Text(data.subtitle,
+            Text(subtitle,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
             ),
             const Spacer(),
@@ -894,6 +907,173 @@ class LineChartCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class SimpleLineChartPainter extends CustomPainter {
+  SimpleLineChartPainter({
+    required this.data,
+    required this.scheme,
+  });
+
+  final PreparedChartData data;
+  final ColorScheme scheme;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const leftPadding = 48.0;
+    const rightPadding = 16.0;
+    const topPadding = 16.0;
+    const bottomPadding = 34.0;
+
+    final chartRect = Rect.fromLTWH(
+      leftPadding,
+      topPadding,
+      math.max(0, size.width - leftPadding - rightPadding),
+      math.max(0, size.height - topPadding - bottomPadding),
+    );
+
+    final gridPaint = Paint()
+      ..color = scheme.outlineVariant.withValues(alpha: 0.55)
+      ..strokeWidth = 1;
+
+    final borderPaint = Paint()
+      ..color = scheme.outline.withValues(alpha: 0.22)
+      ..strokeWidth = 1;
+
+    final linePaint = Paint()
+      ..color = scheme.primary
+      ..strokeWidth = 2.4
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final pointPaint = Paint()
+      ..color = scheme.primary
+      ..style = PaintingStyle.fill;
+
+    final labelStyle = TextStyle(
+      color: scheme.onSurfaceVariant,
+      fontSize: 11,
+      fontWeight: FontWeight.w500,
+    );
+
+    for (final y in data.yLabels) {
+      final yPos = _mapY(y, chartRect);
+      canvas.drawLine(
+        Offset(chartRect.left, yPos),
+        Offset(chartRect.right, yPos),
+        gridPaint,
+      );
+
+      _paintText(
+        canvas,
+        _compactNumber(y),
+        Offset(6, yPos - 7),
+        labelStyle,
+        maxWidth: leftPadding - 10,
+      );
+    }
+
+    for (final x in data.xLabels) {
+      final xPos = _mapX(x, chartRect);
+      canvas.drawLine(
+        Offset(xPos, chartRect.top),
+        Offset(xPos, chartRect.bottom),
+        gridPaint,
+      );
+
+      _paintText(
+        canvas,
+        _formatXAxisLabel(x, data.axisStart, data.axisEnd),
+        Offset(xPos - 18, chartRect.bottom + 8),
+        labelStyle,
+        maxWidth: 52,
+      );
+    }
+
+    canvas.drawRect(chartRect, borderPaint);
+
+    if (data.points.isEmpty) return;
+
+    final path = Path();
+    for (var i = 0; i < data.points.length; i++) {
+      final point = data.points[i];
+      final dx = _mapX(point.time, chartRect);
+      final dy = _mapY(point.value, chartRect);
+
+      if (i == 0) {
+        path.moveTo(dx, dy);
+      } else {
+        path.lineTo(dx, dy);
+      }
+    }
+
+    canvas.drawPath(path, linePaint);
+
+    for (final point in data.points) {
+      final dx = _mapX(point.time, chartRect);
+      final dy = _mapY(point.value, chartRect);
+      canvas.drawCircle(Offset(dx, dy), 2.8, pointPaint);
+    }
+  }
+
+  double _mapX(DateTime value, Rect rect) {
+    final totalMs = data.axisEnd.difference(data.axisStart).inMilliseconds;
+    if (totalMs <= 0) return rect.left;
+
+    final offsetMs = value.difference(data.axisStart).inMilliseconds;
+    final ratio = (offsetMs / totalMs).clamp(0.0, 1.0);
+    return rect.left + rect.width * ratio;
+  }
+
+  double _mapY(double value, Rect rect) {
+    final minY = data.yLabels.isEmpty ? 0.0 : data.yLabels.first;
+    final maxY = data.yLabels.isEmpty ? 1.0 : data.yLabels.last;
+    final span = (maxY - minY).abs() < 0.0001 ? 1.0 : (maxY - minY);
+    final ratio = ((value - minY) / span).clamp(0.0, 1.0);
+    return rect.bottom - rect.height * ratio;
+  }
+
+  String _compactNumber(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toStringAsFixed(0);
+    }
+    return value.toStringAsFixed(1);
+  }
+
+  String _formatXAxisLabel(DateTime value, DateTime from, DateTime to) {
+    final totalDays = to.difference(from).inDays;
+
+    if (totalDays <= 1) {
+      return '${value.hour.toString().padLeft(2, '0')}:'
+          '${value.minute.toString().padLeft(2, '0')}';
+    }
+
+    return '${value.day.toString().padLeft(2, '0')}/'
+        '${value.month.toString().padLeft(2, '0')}';
+  }
+
+  void _paintText(
+      Canvas canvas,
+      String text,
+      Offset offset,
+      TextStyle style, {
+        double maxWidth = 80,
+      }) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+      ellipsis: '…',
+    )..layout(maxWidth: maxWidth);
+
+    painter.paint(canvas, offset);
+  }
+
+  @override
+  bool shouldRepaint(covariant SimpleLineChartPainter oldDelegate) {
+    return oldDelegate.data != data || oldDelegate.scheme != scheme;
   }
 }
 
@@ -1053,4 +1233,54 @@ String monitorCaption(ChartMetric metric, ChartRange range) {
     case ChartRange.month:
       return '$metricLabel mensual';
   }
+}
+
+String chartCardTitle(ChartMetric metric) {
+  switch (metric) {
+    case ChartMetric.consumption:
+      return 'Consumo del dispositivo';
+    case ChartMetric.power:
+      return 'Potencia del dispositivo';
+    case ChartMetric.voltage:
+      return 'Voltaje del dispositivo';
+  }
+}
+
+String chartCardSubtitle({
+  required ChartRange range,
+  required DateTime start,
+  required DateTime end,
+}) {
+  final startText = _formatDateTimeForSubtitle(start, includeDate: true);
+  final endText = _formatDateTimeForSubtitle(
+    end,
+    includeDate: range != ChartRange.today,
+  );
+
+  switch (range) {
+    case ChartRange.today:
+      return 'Ventana reciente: $startText - $endText';
+    case ChartRange.week:
+      return 'Últimos 7 días: $startText - $endText';
+    case ChartRange.month:
+      return 'Últimos 30 días: $startText - $endText';
+  }
+}
+
+double chartCardTotal(PreparedChartData data) {
+  return data.points.fold<double>(0.0, (sum, point) => sum + point.value);
+}
+
+String _formatDateTimeForSubtitle(DateTime value, {required bool includeDate}) {
+  final hour = value.hour.toString().padLeft(2, '0');
+  final minute = value.minute.toString().padLeft(2, '0');
+
+  if (!includeDate) {
+    return '$hour:$minute';
+  }
+
+  final day = value.day.toString().padLeft(2, '0');
+  final month = value.month.toString().padLeft(2, '0');
+  final year = value.year.toString();
+  return '$day/$month/$year $hour:$minute';
 }

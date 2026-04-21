@@ -1,17 +1,31 @@
 import 'package:flutter/foundation.dart';
 import 'package:iot_manager/core/iot/shelly/shelly_rpc_client.dart';
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
+import 'package:iot_manager/features/devices/data/repositories/devices_repository_impl.dart';
+import 'package:iot_manager/features/devices/domain/usecases/get_active_incidents_by_types.dart';
+import 'package:iot_manager/features/devices/domain/usecases/get_device_id_by_identifier.dart';
+import 'package:iot_manager/features/devices/domain/usecases/resolve_incidents.dart';
 
 class DeviceSafetyController extends ChangeNotifier {
   DeviceSafetyController({
     required this.host,
     DevicesRemoteDatasource? remoteDatasource,
   })  : rpc = ShellyRpcClient(host: host),
-        remoteDatasource = remoteDatasource ?? DevicesRemoteDatasource();
+        getActiveIncidentsByTypes = GetActiveIncidentsByTypes(
+          DevicesRepositoryImpl(remoteDatasource ?? DevicesRemoteDatasource()),
+        ),
+        getDeviceIdByIdentifier = GetDeviceIdByIdentifier(
+          DevicesRepositoryImpl(remoteDatasource ?? DevicesRemoteDatasource()),
+        ),
+        resolveIncidentsUseCase = ResolveIncidents(
+          DevicesRepositoryImpl(remoteDatasource ?? DevicesRemoteDatasource()),
+        );
 
   final String host;
   final ShellyRpcClient rpc;
-  final DevicesRemoteDatasource remoteDatasource;
+  final GetActiveIncidentsByTypes getActiveIncidentsByTypes;
+  final GetDeviceIdByIdentifier getDeviceIdByIdentifier;
+  final ResolveIncidents resolveIncidentsUseCase;
 
   bool loading = false;
   bool savingPower = false;
@@ -23,7 +37,6 @@ class DeviceSafetyController extends ChangeNotifier {
   double? currentLimit;
 
   String? error;
-
   String? deviceIdCache;
 
   Future<void> load() async {
@@ -103,11 +116,7 @@ class DeviceSafetyController extends ChangeNotifier {
   Future<void> saveField(String key, double? value) async {
     await rpc.call('Switch.SetConfig', params: {
         'id': 0,
-        'config': {
-          'power_limit': key == 'power_limit' ? value : powerLimit,
-          'voltage_limit': key == 'voltage_limit' ? value : voltageLimit,
-          'current_limit': key == 'current_limit' ? value : currentLimit,
-        },
+        'config': {key: value},
       },
     );
   }
@@ -116,58 +125,42 @@ class DeviceSafetyController extends ChangeNotifier {
     required String changedKey,
     required double? newLimit,
   }) async {
-    if (newLimit == null || newLimit <= 0) return;
+    if (newLimit == null) return;
 
     final deviceId = await getDeviceId();
     if (deviceId == null || deviceId.isEmpty) return;
 
-    final targetType = targetIncidentTypeForKey(changedKey);
-    if (targetType == null) return;
+    final incidentTypes = typesForConfigKey(changedKey);
+    if (incidentTypes.isEmpty) return;
 
-    final activeIncidents = await remoteDatasource.getActiveIncidentsByTypes(
+    final activeIncidents = await getActiveIncidentsByTypes(
       deviceId: deviceId,
-      types: [targetType, 'safety_shutdown'],
+      types: incidentTypes,
     );
 
     if (activeIncidents.isEmpty) return;
 
     final idsToResolve = <String>{};
-    var resolvedSpecific = false;
 
     for (final incident in activeIncidents) {
-      final id = (incident['id'] ?? '').toString();
-      final type = (incident['type'] ?? '').toString().toLowerCase().trim();
+      final metricValue = toDouble(
+        incident['trigger_value'] ?? incident['value'],
+      );
 
-      if (id.isEmpty) continue;
+      if (metricValue == null) continue;
 
-      if (type == targetType) {
-        final measuredValue = extractMeasuredValueFromIncident(
-          incident['message']?.toString() ?? '',
-          targetType,
-        );
+      final shouldResolve = metricValue <= newLimit;
+      if (!shouldResolve) continue;
 
-        if (measuredValue != null && measuredValue <= newLimit) {
-          idsToResolve.add(id);
-          resolvedSpecific = true;
-        }
-      }
+      final incidentId = (incident['id'] ?? '').toString();
+      if (incidentId.isEmpty) continue;
+
+      idsToResolve.add(incidentId);
     }
 
-    if (resolvedSpecific) {
-      for (final incident in activeIncidents) {
-        final id = (incident['id'] ?? '').toString();
-        final type = (incident['type'] ?? '').toString().toLowerCase().trim();
+    if (idsToResolve.isEmpty) return;
 
-        if (id.isEmpty) continue;
-        if (type == 'safety_shutdown') {
-          idsToResolve.add(id);
-        }
-      }
-    }
-
-    if (idsToResolve.isNotEmpty) {
-      await remoteDatasource.resolveIncidents(idsToResolve.toList());
-    }
+    await resolveIncidentsUseCase(idsToResolve.toList());
   }
 
   Future<String?> getDeviceId() async {
@@ -175,67 +168,40 @@ class DeviceSafetyController extends ChangeNotifier {
       return deviceIdCache;
     }
 
-    deviceIdCache = await remoteDatasource.getDeviceIdByIdentifier(host);
+    deviceIdCache = await getDeviceIdByIdentifier(host);
     return deviceIdCache;
   }
 
-  String? targetIncidentTypeForKey(String key) {
+  List<String> typesForConfigKey(String key) {
     switch (key) {
-      case 'voltage_limit':
-        return 'overvoltage';
       case 'power_limit':
-        return 'overpower';
+        return ['max_power_exceeded', 'power_limit_exceeded'];
+      case 'voltage_limit':
+        return ['max_voltage_exceeded', 'voltage_limit_exceeded'];
       case 'current_limit':
-        return 'overcurrent';
+        return ['max_current_exceeded', 'current_limit_exceeded'];
       default:
-        return null;
+        return const [];
     }
   }
 
-  double? extractMeasuredValueFromIncident(String message, String type) {
-    if (message.trim().isEmpty) return null;
-
-    RegExp? regex;
-    switch (type) {
-      case 'overvoltage':
-        regex = RegExp(r'alcanzó\s+([\d.,]+)\s*V', caseSensitive: false);
-        break;
-      case 'overpower':
-        regex = RegExp(r'alcanzó\s+([\d.,]+)\s*W', caseSensitive: false);
-        break;
-      case 'overcurrent':
-        regex = RegExp(r'alcanzó\s+([\d.,]+)\s*A', caseSensitive: false);
-        break;
-      default:
-        return null;
-    }
-
-    final match = regex.firstMatch(message);
-    if (match == null) return null;
-
-    final raw = (match.group(1) ?? '').replaceAll(',', '.').trim();
-    if (raw.isEmpty) return null;
-
-    return double.tryParse(raw);
-  }
-
-  static double? toDouble(dynamic v) {
-    if (v is num) return v.toDouble();
-    if (v is String) {
-      return double.tryParse(v.replaceAll(',', '.'));
-    }
-    return null;
+  double? toDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
   }
 
   static String formatNumber(double? value) {
     if (value == null) return '';
-    if (value == value.roundToDouble()) return value.toInt().toString();
-    return value.toString();
+    if (value == value.roundToDouble()) {
+      return value.toStringAsFixed(0);
+    }
+    return value.toStringAsFixed(2);
   }
 
   static double? parseValue(String text) {
-    final cleaned = text.trim().replaceAll(',', '.');
-    if (cleaned.isEmpty) return null;
-    return double.tryParse(cleaned);
+    final normalized = text.trim().replaceAll(',', '.');
+    if (normalized.isEmpty) return null;
+    return double.tryParse(normalized);
   }
 }

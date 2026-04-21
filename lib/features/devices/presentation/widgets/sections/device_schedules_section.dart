@@ -289,18 +289,23 @@ class DeviceSchedulesSectionState extends State<DeviceSchedulesSection> {
 
     if (confirmed != true) return;
 
-    final created = await controller.create(
-      hour: selectedTime.hour,
-      minute: selectedTime.minute,
-      action: selectedAction,
-      days: selectedDays.toList()..sort(),
-    );
+    try {
+      final created = await controller.create(
+        hour: selectedTime.hour,
+        minute: selectedTime.minute,
+        action: selectedAction,
+        days: selectedDays.toList()..sort(),
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if (created) {
-      showSnack('Horario guardado correctamente.');
-    } else {
+      if (created) {
+        showSnack('Horario guardado correctamente.');
+      } else {
+        showControllerError(fallback: 'No se pudo guardar el horario.');
+      }
+    } catch (_) {
+      if (!mounted) return;
       showControllerError(fallback: 'No se pudo guardar el horario.');
     }
   }
@@ -352,25 +357,26 @@ class DeviceSchedulesSectionState extends State<DeviceSchedulesSection> {
     );
   }
 
-  Future<void> deleteSchedule(String id) async {
-    final deleted = await controller.delete(id);
+  Future<void> deleteSchedule(Map<String, dynamic> row) async {
+    try {
+      await controller.remove(row);
 
-    if (!mounted) return;
-
-    if (deleted) {
+      if (!mounted) return;
       showSnack('Horario eliminado.');
-    } else {
-      showControllerError(fallback: 'No se pudo eliminar el horario.',);
+    } catch (_) {
+      if (!mounted) return;
+      showControllerError(fallback: 'No se pudo eliminar el horario.');
     }
   }
 
-  Future<void> toggleSchedule(String id, bool value) async {
-    final updated = await controller.toggleEnabled(id, value);
+  Future<void> toggleSchedule(Map<String, dynamic> row, bool value) async {
+    try {
+      await controller.toggle(row, value);
 
-    if (!mounted) return;
-
-    if (!updated) {
-      showControllerError(fallback: 'No se pudo actualizar el horario.',);
+      if (!mounted) return;
+    } catch (_) {
+      if (!mounted) return;
+      showControllerError(fallback: 'No se pudo actualizar el horario.');
     }
   }
 
@@ -498,14 +504,13 @@ class DeviceSchedulesSectionState extends State<DeviceSchedulesSection> {
           )
         else
           ...controller.schedules.map((row) {
-            final id = (row['id'] ?? '').toString();
             final enabled = row['enabled'] == true;
 
-            final config = DeviceSchedulesController.mapFrom(row['config']);
-            final hour = DeviceSchedulesController.intFrom(config['hour']);
-            final minute = DeviceSchedulesController.intFrom(config['minute']);
+            final config = _mapFrom(row['config']);
+            final hour = _intFrom(config['hour']);
+            final minute = _intFrom(config['minute']);
             final action = (config['action'] ?? 'on').toString().toLowerCase();
-            final days = DeviceSchedulesController.daysFromConfig(config['days']);
+            final days = _daysFromConfig(config['days']);
 
             final timeLabel = hour != null && minute != null
                 ? TimeOfDay(hour: hour, minute: minute).format(context)
@@ -514,7 +519,7 @@ class DeviceSchedulesSectionState extends State<DeviceSchedulesSection> {
             final actionLabel = action == 'off' ? 'Apagar' : 'Encender';
             final actionColor = action == 'off' ? colorScheme.error : colorScheme.primary;
 
-            final daysLabel = DeviceSchedulesController.formatDays(days);
+            final daysLabel = _formatDays(days);
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 14),
@@ -566,7 +571,7 @@ class DeviceSchedulesSectionState extends State<DeviceSchedulesSection> {
                           scale: 0.95,
                           child: Switch(
                             value: enabled,
-                            onChanged: controller.busy ? null : (value) => toggleSchedule(id, value),
+                            onChanged: controller.busy ? null : (value) => toggleSchedule(row, value),
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -574,10 +579,10 @@ class DeviceSchedulesSectionState extends State<DeviceSchedulesSection> {
                           color: Colors.transparent,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(10),
-                            onTap: controller.busy ? null : () => deleteSchedule(id),
+                            onTap: controller.busy ? null : () => deleteSchedule(row),
                             child: Padding(
                               padding: const EdgeInsets.all(6),
-                              child: Icon(Icons.delete_outline, size: 21, color: colorScheme.onSurfaceVariant),
+                              child: Icon(Icons.delete_outline, size: 21, color: colorScheme.onSurfaceVariant,),
                             ),
                           ),
                         ),
@@ -645,6 +650,62 @@ class DeviceSchedulesSectionState extends State<DeviceSchedulesSection> {
       ),
       child: child,
     );
+  }
+
+  Map<String, dynamic> _mapFrom(dynamic value) {
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+    return <String, dynamic>{};
+  }
+
+  int? _intFrom(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
+  }
+
+  List<int> _daysFromConfig(dynamic value) {
+    if (value is List) {
+      return value
+          .map((e) => _intFrom(e))
+          .whereType<int>()
+          .where((e) => e >= 0 && e <= 6)
+          .toList()
+        ..sort();
+    }
+    return <int>[];
+  }
+
+  String _formatDays(List<int> days) {
+    if (days.isEmpty) return 'Sin días definidos';
+
+    const labels = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+
+    final normalized = [...days]..sort();
+
+    if (_sameDays(normalized, const [0, 1, 2, 3, 4])) {
+      return 'Lunes a viernes';
+    }
+
+    if (_sameDays(normalized, const [5, 6])) {
+      return 'Fin de semana';
+    }
+
+    if (_sameDays(normalized, const [0, 1, 2, 3, 4, 5, 6])) {
+      return 'Todos los días';
+    }
+
+    return normalized.map((day) => labels[day]).join(' · ');
+  }
+
+  bool _sameDays(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 }
 

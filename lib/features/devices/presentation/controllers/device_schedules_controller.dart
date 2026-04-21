@@ -3,17 +3,32 @@ import 'package:iot_manager/core/error/app_exception.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
 import 'package:iot_manager/core/iot/shelly/shelly_rpc_client.dart';
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
+import 'package:iot_manager/features/devices/data/repositories/devices_repository_impl.dart';
+import 'package:iot_manager/features/devices/domain/usecases/delete_automation.dart';
+import 'package:iot_manager/features/devices/domain/usecases/fetch_automations.dart';
+import 'package:iot_manager/features/devices/domain/usecases/upsert_automation.dart';
 
 class DeviceSchedulesController extends ChangeNotifier {
   DeviceSchedulesController({
     required this.deviceId,
     required this.host,
-    required this.remoteDatasource,
-  }) : rpcClient = ShellyRpcClient(host: host);
+    required DevicesRemoteDatasource remoteDatasource,
+  })  : fetchAutomations = FetchAutomations(
+    DevicesRepositoryImpl(remoteDatasource),
+  ),
+        upsertAutomation = UpsertAutomation(
+          DevicesRepositoryImpl(remoteDatasource),
+        ),
+        deleteAutomation = DeleteAutomation(
+          DevicesRepositoryImpl(remoteDatasource),
+        ),
+        rpcClient = ShellyRpcClient(host: host);
 
   final String deviceId;
   final String host;
-  final DevicesRemoteDatasource remoteDatasource;
+  final FetchAutomations fetchAutomations;
+  final UpsertAutomation upsertAutomation;
+  final DeleteAutomation deleteAutomation;
   final ShellyRpcClient rpcClient;
 
   bool loading = false;
@@ -27,7 +42,7 @@ class DeviceSchedulesController extends ChangeNotifier {
 
     try {
       validateBaseData();
-      schedules = await remoteDatasource.fetchAutomations(
+      schedules = await fetchAutomations(
         deviceId: deviceId,
         type: 'schedule',
       );
@@ -59,12 +74,20 @@ class DeviceSchedulesController extends ChangeNotifier {
       );
 
       final normalizedDays = normalizeDays(days);
-      final timespec = buildTimespec(hour: hour, minute: minute, days: normalizedDays);
+      final timespec = buildTimespec(
+        hour: hour,
+        minute: minute,
+        days: normalizedDays,
+      );
       final calls = buildCalls(action);
 
-      shellyScheduleId = await rpcClient.createSchedule(enable: true, timespec: timespec, calls: calls);
+      shellyScheduleId = await rpcClient.createSchedule(
+        enable: true,
+        timespec: timespec,
+        calls: calls,
+      );
 
-      await remoteDatasource.upsertAutomation(
+      await upsertAutomation(
         deviceId: deviceId,
         type: 'schedule',
         enabled: true,
@@ -74,11 +97,12 @@ class DeviceSchedulesController extends ChangeNotifier {
           'action': action,
           'days': normalizedDays,
           'timespec': timespec,
+          'calls': calls,
           'shelly_schedule_id': shellyScheduleId,
         },
       );
 
-      await reloadSchedulesSilently();
+      await load();
       return true;
     } catch (err) {
       if (shellyScheduleId != null) {
@@ -88,156 +112,190 @@ class DeviceSchedulesController extends ChangeNotifier {
       }
 
       setMappedError(err);
-      return false;
+      rethrow;
     } finally {
       setBusy(false);
     }
   }
 
-  Future<bool> toggleEnabled(String automationId, bool enabled) async {
-    if (automationId.trim().isEmpty) {
-      setMappedError(
-        const ValidationAppException('No se ha encontrado un identificador válido para el horario.'),
-      );
-      return false;
-    }
-
+  Future<void> toggle(Map<String, dynamic> row, bool enabled) async {
     setBusy(true);
     clearError();
 
     try {
       validateBaseData();
 
-      final row = findRowById(automationId);
-      if (row == null) {
-        throw const ValidationAppException('No se ha encontrado el horario seleccionado.');
+      final id = (row['id'] ?? '').toString();
+      if (id.trim().isEmpty) {
+        throw const ValidationAppException(
+          'No se ha encontrado un horario válido.',
+        );
       }
 
       final config = mapFrom(row['config']);
-      final hour = intFrom(config['hour']);
-      final minute = intFrom(config['minute']);
-      final action = (config['action'] ?? 'on').toString().toLowerCase();
-      final days = daysFromConfig(config['days']);
-
-      if (hour == null || minute == null || days.isEmpty) {
-        throw const ValidationAppException('El horario guardado no tiene una configuración válida.');
+      final shellyScheduleId = intFrom(config['shelly_schedule_id']);
+      if (shellyScheduleId == null) {
+        throw const ValidationAppException(
+          'El horario no tiene un identificador válido en el dispositivo.',
+        );
       }
 
-      final timespec = buildTimespec(
-        hour: hour,
-        minute: minute,
-        days: days,
+      await rpcClient.call(
+        'Schedule.Update',
+        params: {
+          'id': shellyScheduleId,
+          'enable': enabled,
+        },
       );
-      final calls = buildCalls(action);
 
-      final shellyId = intFrom(config['shelly_schedule_id']);
-
-      if (shellyId != null) {
-        await rpcClient.updateSchedule(
-          id: shellyId,
-          enable: enabled,
-        );
-      } else {
-        final createdId = await rpcClient.createSchedule(
-          enable: enabled,
-          timespec: timespec,
-          calls: calls,
-        );
-        config['shelly_schedule_id'] = createdId;
-      }
-
-      config['timespec'] = timespec;
-
-      await remoteDatasource.upsertAutomation(
-        id: automationId,
+      await upsertAutomation(
+        id: id,
         deviceId: deviceId,
         type: 'schedule',
         enabled: enabled,
         config: config,
       );
 
-      await reloadSchedulesSilently();
-      return true;
+      await load();
     } catch (err) {
       setMappedError(err);
-      return false;
+      rethrow;
     } finally {
       setBusy(false);
     }
   }
 
-  Future<bool> delete(String automationId) async {
-    if (automationId.trim().isEmpty) {
-      setMappedError(
-        const ValidationAppException('No se ha encontrado un identificador válido para el horario.'),
-      );
-      return false;
-    }
-
+  Future<void> remove(Map<String, dynamic> row) async {
     setBusy(true);
     clearError();
 
     try {
       validateBaseData();
 
-      final row = findRowById(automationId);
-      if (row == null) {
-        throw const ValidationAppException('No se ha encontrado el horario seleccionado.');
+      final automationId = (row['id'] ?? '').toString();
+      if (automationId.trim().isEmpty) {
+        throw const ValidationAppException(
+          'No se ha encontrado un horario válido.',
+        );
       }
 
       final config = mapFrom(row['config']);
-      final shellyId = intFrom(config['shelly_schedule_id']);
+      final shellyScheduleId = intFrom(config['shelly_schedule_id']);
 
-      if (shellyId != null) {
-        await rpcClient.deleteSchedule(id: shellyId);
+      if (shellyScheduleId != null) {
+        await rpcClient.deleteSchedule(id: shellyScheduleId);
       }
 
-      await remoteDatasource.deleteAutomation(automationId);
-      await reloadSchedulesSilently();
-      return true;
+      await deleteAutomation(automationId);
+      await load();
     } catch (err) {
       setMappedError(err);
-      return false;
+      rethrow;
     } finally {
       setBusy(false);
     }
   }
 
-  Map<String, dynamic>? findRowById(String automationId) {
+  Future<void> refreshSilently() async {
     try {
-      return schedules.firstWhere((row) => (row['id'] ?? '').toString() == automationId);
-    } catch (_) {
-      return null;
-    }
-  }
+      validateBaseData();
+      schedules = await fetchAutomations(
+        deviceId: deviceId,
+        type: 'schedule',
+      );
 
-  Future<void> reloadSchedulesSilently() async {
-    schedules = await remoteDatasource.fetchAutomations(
-      deviceId: deviceId,
-      type: 'schedule',
-    );
-    notifyListeners();
+      if (error != null) {
+        error = null;
+        notifyListeners();
+        return;
+      }
+
+      notifyListeners();
+    } catch (err) {
+      if (error == null) {
+        setMappedError(err);
+        notifyListeners();
+      }
+    }
   }
 
   void validateBaseData() {
     if (deviceId.trim().isEmpty) {
-      throw const ValidationAppException('No se ha encontrado un identificador válido para el dispositivo.');
+      throw const ValidationAppException(
+        'No se ha encontrado un dispositivo válido.',
+      );
     }
 
     if (host.trim().isEmpty) {
-      throw const ValidationAppException('La dirección del dispositivo no es válida.');
+      throw const ValidationAppException(
+        'No se ha encontrado la dirección del dispositivo.',
+      );
     }
   }
 
-  void setMappedError(Object err) {
-    final failure = ErrorMapper.mapFailure(err);
-    error = failure.message;
-    notifyListeners();
+  void validateInput({
+    required int hour,
+    required int minute,
+    required String action,
+    required List<int> days,
+  }) {
+    if (hour < 0 || hour > 23) {
+      throw const ValidationAppException('La hora debe estar entre 0 y 23.');
+    }
+
+    if (minute < 0 || minute > 59) {
+      throw const ValidationAppException(
+        'Los minutos deben estar entre 0 y 59.',
+      );
+    }
+
+    if (action != 'on' && action != 'off') {
+      throw const ValidationAppException('La acción debe ser ON u OFF.');
+    }
+
+    if (days.isEmpty) {
+      throw const ValidationAppException(
+        'Debes seleccionar al menos un día.',
+      );
+    }
   }
 
-  void clearError() {
-    error = null;
-    notifyListeners();
+  List<int> normalizeDays(List<int> days) {
+    final normalized = days.toSet().toList()..sort();
+    return normalized.where((day) => day >= 0 && day <= 6).toList();
+  }
+
+  String buildTimespec({
+    required int hour,
+    required int minute,
+    required List<int> days,
+  }) {
+    final daysPart = days.join(',');
+    final hh = hour.toString().padLeft(2, '0');
+    final mm = minute.toString().padLeft(2, '0');
+    return '0 $mm $hh * * $daysPart';
+  }
+
+  List<Map<String, dynamic>> buildCalls(String action) {
+    final on = action == 'on';
+    return [
+      {
+        'method': 'Switch.Set',
+        'params': {'id': 0, 'on': on},
+      },
+    ];
+  }
+
+  Map<String, dynamic> mapFrom(dynamic value) {
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return <String, dynamic>{};
+  }
+
+  int? intFrom(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
   }
 
   void setLoading(bool value) {
@@ -250,137 +308,13 @@ class DeviceSchedulesController extends ChangeNotifier {
     notifyListeners();
   }
 
-  static void validateInput({
-    required int hour,
-    required int minute,
-    required String action,
-    required List<int> days,
-  }) {
-    if (hour < 0 || hour > 23) {
-      throw const ValidationAppException('La hora no es válida.');
-    }
-
-    if (minute < 0 || minute > 59) {
-      throw const ValidationAppException('Los minutos no son válidos.');
-    }
-
-    if (action != 'on' && action != 'off') {
-      throw const ValidationAppException('La acción del horario no es válida.');
-    }
-
-    if (days.isEmpty) {
-      throw const ValidationAppException('Debes seleccionar al menos un día.');
-    }
+  void clearError() {
+    error = null;
+    notifyListeners();
   }
 
-  static List<Map<String, dynamic>> buildCalls(String action) {
-    final on = action.toLowerCase() == 'on';
-
-    return [
-      {
-        'method': 'Switch.Set',
-        'params': {
-          'id': 0,
-          'on': on,
-        },
-      },
-    ];
-  }
-
-  static String buildTimespec({
-    required int hour,
-    required int minute,
-    required List<int> days,
-  }) {
-    final cronDays = normalizeDays(days).map(dayToCron).join(',');
-    return '0 $minute $hour * * $cronDays';
-  }
-
-  static String dayToCron(int day) {
-    switch (day) {
-      case 1:
-        return 'MON';
-      case 2:
-        return 'TUE';
-      case 3:
-        return 'WED';
-      case 4:
-        return 'THU';
-      case 5:
-        return 'FRI';
-      case 6:
-        return 'SAT';
-      case 7:
-        return 'SUN';
-      default:
-        throw const ValidationAppException('Se ha encontrado un día no válido en el horario.');
-    }
-  }
-
-  static List<int> normalizeDays(List<int> rawDays) {
-    final result = rawDays
-        .map(intFrom)
-        .whereType<int>()
-        .where((d) => d >= 1 && d <= 7)
-        .toSet()
-        .toList()
-      ..sort();
-
-    return result;
-  }
-
-  static int? intFrom(dynamic value) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) return int.tryParse(value);
-    return null;
-  }
-
-  static Map<String, dynamic> mapFrom(dynamic value) {
-    if (value is Map) {
-      return Map<String, dynamic>.from(value);
-    }
-    return <String, dynamic>{};
-  }
-
-  static List<int> daysFromConfig(dynamic raw) {
-    if (raw is! List) return const [];
-
-    return raw
-        .map(intFrom)
-        .whereType<int>()
-        .where((e) => e >= 1 && e <= 7)
-        .toSet()
-        .toList()
-      ..sort();
-  }
-
-  static String formatDays(List<int> days) {
-    if (days.isEmpty) return 'Sin días';
-    if (sameDays(days, [1, 2, 3, 4, 5, 6, 7])) return 'Todos los días';
-    if (sameDays(days, [1, 2, 3, 4, 5])) return 'Lunes a viernes';
-    if (sameDays(days, [6, 7])) return 'Fin de semana';
-
-    const names = {
-      1: 'Lun',
-      2: 'Mar',
-      3: 'Mié',
-      4: 'Jue',
-      5: 'Vie',
-      6: 'Sáb',
-      7: 'Dom',
-    };
-
-    return days.map((d) => names[d] ?? d.toString()).join(', ');
-  }
-
-  static bool sameDays(List<int> a, List<int> b) {
-    if (a.length != b.length) return false;
-
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-
-    return true;
+  void setMappedError(Object error) {
+    this.error = ErrorMapper.mapFailure(error).message;
+    notifyListeners();
   }
 }

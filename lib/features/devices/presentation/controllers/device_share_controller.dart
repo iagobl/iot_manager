@@ -2,6 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:iot_manager/core/error/app_exception.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
+import 'package:iot_manager/features/devices/data/repositories/devices_repository_impl.dart';
+import 'package:iot_manager/features/devices/domain/usecases/fetch_device_ownership.dart';
+import 'package:iot_manager/features/devices/domain/usecases/get_device_shares.dart';
+import 'package:iot_manager/features/devices/domain/usecases/get_profiles_by_ids.dart';
+import 'package:iot_manager/features/devices/domain/usecases/invite_device_share_by_email.dart';
+import 'package:iot_manager/features/devices/domain/usecases/leave_shared_device.dart';
+import 'package:iot_manager/features/devices/domain/usecases/revoke_device_share.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DeviceShareController extends ChangeNotifier {
@@ -10,12 +17,34 @@ class DeviceShareController extends ChangeNotifier {
     required this.deviceName,
     DevicesRemoteDatasource? remoteDatasource,
     SupabaseClient? supabase,
-  })  : remoteDatasource = remoteDatasource ?? DevicesRemoteDatasource(),
+  })  : fetchDeviceOwnership = FetchDeviceOwnership(
+    DevicesRepositoryImpl(remoteDatasource ?? DevicesRemoteDatasource()),
+  ),
+        getDeviceShares = GetDeviceShares(
+          DevicesRepositoryImpl(remoteDatasource ?? DevicesRemoteDatasource()),
+        ),
+        getProfilesByIds = GetProfilesByIds(
+          DevicesRepositoryImpl(remoteDatasource ?? DevicesRemoteDatasource()),
+        ),
+        inviteDeviceShareByEmail = InviteDeviceShareByEmail(
+          DevicesRepositoryImpl(remoteDatasource ?? DevicesRemoteDatasource()),
+        ),
+        revokeDeviceShare = RevokeDeviceShare(
+          DevicesRepositoryImpl(remoteDatasource ?? DevicesRemoteDatasource()),
+        ),
+        leaveSharedDeviceUseCase = LeaveSharedDevice(
+          DevicesRepositoryImpl(remoteDatasource ?? DevicesRemoteDatasource()),
+        ),
         supabase = supabase ?? Supabase.instance.client;
 
   final String deviceId;
   final String deviceName;
-  final DevicesRemoteDatasource remoteDatasource;
+  final FetchDeviceOwnership fetchDeviceOwnership;
+  final GetDeviceShares getDeviceShares;
+  final GetProfilesByIds getProfilesByIds;
+  final InviteDeviceShareByEmail inviteDeviceShareByEmail;
+  final RevokeDeviceShare revokeDeviceShare;
+  final LeaveSharedDevice leaveSharedDeviceUseCase;
   final SupabaseClient supabase;
 
   bool loading = false;
@@ -48,7 +77,7 @@ class DeviceShareController extends ChangeNotifier {
         throw const ValidationAppException('No se ha encontrado un identificador válido del dispositivo.');
       }
 
-      final deviceRow = await remoteDatasource.fetchDeviceOwnership(deviceId);
+      final deviceRow = await fetchDeviceOwnership(deviceId);
       if (deviceRow == null) {
         throw const ValidationAppException('No se encontró el dispositivo.');
       }
@@ -56,12 +85,10 @@ class DeviceShareController extends ChangeNotifier {
       final ownerId = (deviceRow['owner_id'] ?? '').toString();
       isOwner = ownerId == currentUserId;
 
-      final allRows = await remoteDatasource.getDeviceShares(deviceId);
+      final allRows = await getDeviceShares(deviceId);
       final rows = isOwner ? allRows : allRows.where((row) {
-
         final sharedWithUserId = (row['shared_with_user_id'] ?? '').toString();
         return sharedWithUserId == currentUserId;
-
       }).toList();
 
       final sharedUserIds = rows
@@ -70,7 +97,7 @@ class DeviceShareController extends ChangeNotifier {
           .toSet()
           .toList();
 
-      final profiles = await remoteDatasource.getProfilesByIds(sharedUserIds);
+      final profiles = await getProfilesByIds(sharedUserIds);
       final profileNames = <String, String>{};
 
       for (final raw in profiles) {
@@ -139,7 +166,7 @@ class DeviceShareController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await remoteDatasource.inviteDeviceShareByEmail(
+      await inviteDeviceShareByEmail(
         deviceId: deviceId,
         email: normalized,
       );
@@ -178,7 +205,7 @@ class DeviceShareController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await remoteDatasource.revokeDeviceShare(normalizedId);
+      await revokeDeviceShare(normalizedId);
       await load();
       return 'Acceso revocado correctamente.';
     } catch (e) {
@@ -214,7 +241,7 @@ class DeviceShareController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await remoteDatasource.leaveSharedDevice(normalizedId);
+      await leaveSharedDeviceUseCase(normalizedId);
       await load();
       return 'Has dejado de tener acceso a este dispositivo.';
     } catch (e) {

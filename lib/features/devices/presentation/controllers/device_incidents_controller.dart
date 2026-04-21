@@ -1,16 +1,21 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
+import 'package:iot_manager/features/devices/data/repositories/devices_repository_impl.dart';
+import 'package:iot_manager/features/devices/domain/usecases/fetch_incidents.dart';
 
 class DeviceIncidentsController extends ChangeNotifier {
   DeviceIncidentsController({
     required this.deviceId,
-    required this.remoteDatasource,
-  });
+    required DevicesRemoteDatasource remoteDatasource,
+  }) : fetchIncidents = FetchIncidents(
+    DevicesRepositoryImpl(remoteDatasource),
+  );
 
   final String deviceId;
-  final DevicesRemoteDatasource remoteDatasource;
+  final FetchIncidents fetchIncidents;
 
   bool loading = false;
   String? error;
@@ -24,7 +29,7 @@ class DeviceIncidentsController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      incidents = await remoteDatasource.fetchIncidents(
+      incidents = await fetchIncidents(
         deviceId: deviceId,
         limit: 100,
       );
@@ -41,7 +46,7 @@ class DeviceIncidentsController extends ChangeNotifier {
     if (loading) return;
 
     try {
-      incidents = await remoteDatasource.fetchIncidents(
+      incidents = await fetchIncidents(
         deviceId: deviceId,
         limit: 100,
       );

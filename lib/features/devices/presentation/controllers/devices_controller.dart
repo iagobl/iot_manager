@@ -10,27 +10,37 @@ import 'package:iot_manager/core/iot/shelly/shelly_telemetry_script_service.dart
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
 import 'package:iot_manager/features/devices/data/repositories/devices_repository_impl.dart';
 import 'package:iot_manager/features/devices/domain/entities/device_item.dart';
+import 'package:iot_manager/features/devices/domain/usecases/create_manual_device.dart';
+import 'package:iot_manager/features/devices/domain/usecases/delete_device.dart';
 import 'package:iot_manager/features/devices/domain/usecases/get_user_devices.dart';
+import 'package:iot_manager/features/devices/domain/usecases/update_device_state.dart';
 
 class DevicesController extends ChangeNotifier {
   DevicesController._(
       this.getUserDevices,
-      this.remoteDatasource,
+      this.createManualDevice,
+      this.updateDeviceState,
+      this.deleteDevice,
       this.telemetryScriptService,
       );
 
   factory DevicesController.create() {
     final datasource = DevicesRemoteDatasource();
     final repository = DevicesRepositoryImpl(datasource);
-    final usecase = GetUserDevices(repository);
 
-    return DevicesController._(usecase, datasource,
+    return DevicesController._(
+      GetUserDevices(repository),
+      CreateManualDevice(repository),
+      UpdateDeviceState(repository),
+      DeleteDevice(repository),
       const ShellyTelemetryScriptService(),
     );
   }
 
   final GetUserDevices getUserDevices;
-  final DevicesRemoteDatasource remoteDatasource;
+  final CreateManualDevice createManualDevice;
+  final UpdateDeviceState updateDeviceState;
+  final DeleteDevice deleteDevice;
   final ShellyTelemetryScriptService telemetryScriptService;
 
   bool isLoading = false;
@@ -67,7 +77,7 @@ class DevicesController extends ChangeNotifier {
     clearError(notify: false);
 
     try {
-      final createdDevice = await remoteDatasource.createManualDevice(
+      final createdDevice = await createManualDevice(
         name: name,
         deviceType: deviceType,
         identifier: identifier,
@@ -79,7 +89,7 @@ class DevicesController extends ChangeNotifier {
           deviceId: createdDevice.id,
         );
       } catch (error) {
-        await remoteDatasource.deleteDevice(createdDevice.id);
+        await deleteDevice(createdDevice.id);
         rethrow;
       }
 
@@ -150,7 +160,7 @@ class DevicesController extends ChangeNotifier {
     try {
       final rpc = ShellyRpcClient(host: device.identifier);
       await rpc.setSwitch(on: on);
-      await remoteDatasource.updateDeviceState(device.id, on);
+      await updateDeviceState(device.id, on);
       await load();
     } catch (error) {
       final failure = ErrorMapper.mapFailure(error);

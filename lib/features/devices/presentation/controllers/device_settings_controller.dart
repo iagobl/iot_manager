@@ -3,18 +3,42 @@ import 'package:iot_manager/core/constants/devices_panel_strings.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
 import 'package:iot_manager/core/iot/shelly/shelly_rpc_client.dart';
 import 'package:iot_manager/features/devices/data/datasources/devices_remote_datasource.dart';
+import 'package:iot_manager/features/devices/data/repositories/devices_repository_impl.dart';
+import 'package:iot_manager/features/devices/domain/usecases/delete_device.dart';
+import 'package:iot_manager/features/devices/domain/usecases/fetch_device_ownership.dart';
+import 'package:iot_manager/features/devices/domain/usecases/rename_device.dart';
+import 'package:iot_manager/features/devices/domain/usecases/set_device_updating.dart';
+import 'package:iot_manager/features/devices/domain/usecases/unlink_device.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DeviceSettingsController extends ChangeNotifier {
   DeviceSettingsController({
     required this.deviceId,
     required this.host,
-    required this.remoteDatasource,
-  });
+    required DevicesRemoteDatasource remoteDatasource,
+  })  : fetchDeviceOwnership = FetchDeviceOwnership(
+    DevicesRepositoryImpl(remoteDatasource),
+  ),
+        renameDeviceUseCase = RenameDevice(
+          DevicesRepositoryImpl(remoteDatasource),
+        ),
+        setDeviceUpdating = SetDeviceUpdating(
+          DevicesRepositoryImpl(remoteDatasource),
+        ),
+        unlinkDeviceUseCase = UnlinkDevice(
+          DevicesRepositoryImpl(remoteDatasource),
+        ),
+        deleteDeviceUseCase = DeleteDevice(
+          DevicesRepositoryImpl(remoteDatasource),
+        );
 
   final String deviceId;
   final String host;
-  final DevicesRemoteDatasource remoteDatasource;
+  final FetchDeviceOwnership fetchDeviceOwnership;
+  final RenameDevice renameDeviceUseCase;
+  final SetDeviceUpdating setDeviceUpdating;
+  final UnlinkDevice unlinkDeviceUseCase;
+  final DeleteDevice deleteDeviceUseCase;
 
   final SupabaseClient _supabase = Supabase.instance.client;
 
@@ -56,42 +80,48 @@ class DeviceSettingsController extends ChangeNotifier {
       await _loadOwnership();
 
       final sysConfig = await rpc.getSysConfig();
-      final location = _mapFrom(sysConfig['location']);
-      timezone = _stringOrNull(location['tz']);
-      lat = _doubleOrNull(location['lat']);
-      lon = _doubleOrNull(location['lon']);
+      final location = mapFrom(sysConfig['location']);
+      timezone = stringOrNull(location['tz']);
+      lat = doubleOrNull(location['lat']);
+      lon = doubleOrNull(location['lon']);
 
       try {
         final update = await rpc.checkForUpdate();
-        final stable = _mapFrom(update['stable']);
-        availableVersion = _stringOrNull(stable['version']);
-        availableBuildId = _stringOrNull(stable['build_id']);
-        updateMessage = availableVersion == null
-            ? DevicesPanelStrings.deviceIsUpdate
-            : DevicesPanelStrings.avaliableUpdate;
-      } catch (error) {
-        final failure = ErrorMapper.mapFailure(error);
-        updateMessage = failure.message;
+        final stable = mapFrom(update['stable']);
+        availableVersion = stringOrNull(stable['version']);
+        availableBuildId = stringOrNull(stable['build_id']);
+      } catch (_) {
+        availableVersion = null;
+        availableBuildId = null;
       }
 
       try {
-        final plugsUi = await rpc.getPlugsUiConfig();
-        final leds = _mapFrom(plugsUi['leds']);
-        final night = _mapFrom(leds['night_mode']);
+        final uiConfig = await rpc.call('PLUGS_UI.GetConfig');
+        final leds = mapFrom(uiConfig['leds']);
+        final nightMode = mapFrom(leds['night_mode']);
 
-        nightModeSupported = night.isNotEmpty;
-        nightModeEnabled = night['enable'] == true;
-        nightBrightness =
-            (_doubleOrNull(night['brightness']) ?? 25).clamp(0, 100).toDouble();
+        nightModeSupported = nightMode.isNotEmpty;
 
-        final between = night['active_between'];
-        if (between is List && between.length == 2) {
-          nightStart = between[0].toString();
-          nightEnd = between[1].toString();
+        if (nightModeSupported) {
+          nightModeEnabled = nightMode['enable'] == true;
+          nightBrightness =
+              (doubleOrNull(nightMode['brightness']) ?? 25).clamp(1, 100);
+          final activeBetween = (nightMode['active_between'] as List?)?.cast<String>() ?? [];
+          if (activeBetween.length == 2) {
+            nightStart = activeBetween[0];
+            nightEnd = activeBetween[1];
+          }
+        } else {
+          nightModeEnabled = false;
+          nightBrightness = 25;
+          nightStart = '23:00';
+          nightEnd = '07:00';
         }
       } catch (_) {
         nightModeSupported = false;
       }
+    } catch (error) {
+      throw ErrorMapper.mapFailure(error);
     } finally {
       loading = false;
       notifyListeners();
@@ -100,19 +130,11 @@ class DeviceSettingsController extends ChangeNotifier {
 
   Future<void> _loadOwnership() async {
     try {
-      final row = await _supabase
-          .from('devices')
-          .select('owner_id')
-          .eq('id', deviceId)
-          .maybeSingle();
-
+      final row = await fetchDeviceOwnership(deviceId);
       final ownerId = (row?['owner_id'] ?? '').toString();
       final currentUserId = _supabase.auth.currentUser?.id ?? '';
 
-      canManageDevice =
-          ownerId.isNotEmpty &&
-              currentUserId.isNotEmpty &&
-              ownerId == currentUserId;
+      canManageDevice = ownerId.isNotEmpty && currentUserId.isNotEmpty && ownerId == currentUserId;
       canFactoryReset = canManageDevice;
     } catch (_) {
       canFactoryReset = false;
@@ -174,9 +196,9 @@ class DeviceSettingsController extends ChangeNotifier {
       final rpc = ShellyRpcClient(host: host);
       final detected = await rpc.detectLocation();
 
-      final tz = _stringOrNull(detected['tz']);
-      final la = _doubleOrNull(detected['lat']);
-      final lo = _doubleOrNull(detected['lon']);
+      final tz = stringOrNull(detected['tz']);
+      final la = doubleOrNull(detected['lat']);
+      final lo = doubleOrNull(detected['lon']);
 
       if (tz != null || la != null || lo != null) {
         await rpc.setSysConfig(
@@ -215,7 +237,7 @@ class DeviceSettingsController extends ChangeNotifier {
 
       await rpc.setSysConfig(config: {'device': {'name': cleanName}});
 
-      await remoteDatasource.renameDevice(
+      await renameDeviceUseCase(
         deviceId: deviceId,
         name: cleanName,
       );
@@ -234,10 +256,10 @@ class DeviceSettingsController extends ChangeNotifier {
     try {
       final rpc = ShellyRpcClient(host: host);
       final result = await rpc.checkForUpdate();
-      final stable = _mapFrom(result['stable']);
+      final stable = mapFrom(result['stable']);
 
-      availableVersion = _stringOrNull(stable['version']);
-      availableBuildId = _stringOrNull(stable['build_id']);
+      availableVersion = stringOrNull(stable['version']);
+      availableBuildId = stringOrNull(stable['build_id']);
       updateMessage = availableVersion == null
           ? DevicesPanelStrings.notAvaliableUpdateStable
           : '${DevicesPanelStrings.pedingUpdate}: $availableVersion';
@@ -254,7 +276,7 @@ class DeviceSettingsController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await remoteDatasource.setDeviceUpdating(
+      await setDeviceUpdating(
         deviceId: deviceId,
         isUpdating: true,
       );
@@ -293,7 +315,7 @@ class DeviceSettingsController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await remoteDatasource.unlinkDevice(deviceId);
+      await unlinkDeviceUseCase(deviceId);
     } finally {
       unlinking = false;
       notifyListeners();
@@ -313,25 +335,25 @@ class DeviceSettingsController extends ChangeNotifier {
     try {
       final rpc = ShellyRpcClient(host: host);
       await rpc.factoryReset();
-      await remoteDatasource.deleteDevice(deviceId);
+      await deleteDeviceUseCase(deviceId);
     } finally {
       factoryResetting = false;
       notifyListeners();
     }
   }
 
-  static Map<String, dynamic> _mapFrom(dynamic value) {
+  static Map<String, dynamic> mapFrom(dynamic value) {
     if (value is Map) return Map<String, dynamic>.from(value);
     return <String, dynamic>{};
   }
 
-  static String? _stringOrNull(dynamic value) {
+  static String? stringOrNull(dynamic value) {
     final text = value?.toString().trim();
     if (text == null || text.isEmpty || text == 'null') return null;
     return text;
   }
 
-  static double? _doubleOrNull(dynamic value) {
+  static double? doubleOrNull(dynamic value) {
     if (value is num) return value.toDouble();
     return null;
   }
