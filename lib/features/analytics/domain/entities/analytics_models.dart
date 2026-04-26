@@ -28,7 +28,7 @@ enum AnalyticsScopeGroup { global, device }
 
 enum AnalyticsMetric { energy, power, voltage, current }
 
-enum AnalyticsRangePreset { today, last7Days, last30Days, custom }
+enum AnalyticsRangePreset { today, last7Days, custom }
 
 class AnalyticsSample {
   const AnalyticsSample({

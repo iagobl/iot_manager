@@ -83,9 +83,7 @@ class AnalyticsChart extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 14),
-          if (aggregateMode)
-            AggregateLegendRow(mode: mode)
-          else const LegendRow(),
+          if (aggregateMode) AggregateLegendRow(mode: mode) else const LegendRow(),
           const SizedBox(height: 18),
           Container(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
@@ -93,7 +91,7 @@ class AnalyticsChart extends StatelessWidget {
               color: scheme.surfaceContainerLowest.withValues(alpha: 0.80),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                  color: scheme.outlineVariant.withValues(alpha: 0.45)),
+                color: scheme.outlineVariant.withValues(alpha: 0.45)),
             ),
             child: SizedBox(
               height: 320,
@@ -139,7 +137,7 @@ class AnalyticsChart extends StatelessWidget {
       case AnalyticsChartMode.currentMoment:
         return 'Comparativa del momento actual';
       case AnalyticsChartMode.weekDays:
-        return 'Comparativa de la semana actual';
+        return 'Comparativa diaria del periodo';
       case AnalyticsChartMode.rangePeriods:
         return 'Comparativa por periodos del rango';
     }
@@ -152,9 +150,9 @@ class AnalyticsChart extends StatelessWidget {
       case AnalyticsChartMode.currentMoment:
         return 'Seguimiento de las últimas horas en intervalos recientes.';
       case AnalyticsChartMode.weekDays:
-        return 'Media diaria de la semana actual.';
+        return 'Una columna por cada día real del periodo seleccionado.';
       case AnalyticsChartMode.rangePeriods:
-        return 'Media por periodos temporales del rango seleccionado.';
+        return 'Agrupación del rango seleccionado en periodos consecutivos.';
     }
   }
 
@@ -165,7 +163,7 @@ class AnalyticsChart extends StatelessWidget {
       case AnalyticsChartMode.currentMoment:
         return 'Potencia (W)';
       case AnalyticsChartMode.weekDays:
-        return 'Consumo de la semana actual';
+        return 'Consumo diario del periodo';
       case AnalyticsChartMode.rangePeriods:
         return 'Consumo por periodos del rango';
     }
@@ -178,9 +176,9 @@ class AnalyticsChart extends StatelessWidget {
       case AnalyticsChartMode.currentMoment:
         return 'Seguimiento en tiempo real';
       case AnalyticsChartMode.weekDays:
-        return 'Evolución del consumo diario de la semana actual.';
+        return 'Consumo diario para cada fecha real del periodo.';
       case AnalyticsChartMode.rangePeriods:
-        return 'Evolución del consumo total por periodos del rango seleccionado.';
+        return 'Consumo total por periodos consecutivos del rango seleccionado.';
     }
   }
 
@@ -199,7 +197,7 @@ class AnalyticsChart extends StatelessWidget {
       case AnalyticsChartMode.currentMoment:
         return buildCurrentMoment(points);
       case AnalyticsChartMode.weekDays:
-        return buildWeekDays(points);
+        return buildDailyBuckets(points, range);
       case AnalyticsChartMode.rangePeriods:
         return buildRangePeriods(points, range);
     }
@@ -257,38 +255,67 @@ class AnalyticsChart extends StatelessWidget {
     }).toList();
   }
 
-  List<GroupedBucket> buildWeekDays(List<AnalyticsPoint> points) {
-    const labels = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
-
-    final powerSums = List<double>.filled(7, 0.0);
-    final voltageSums = List<double>.filled(7, 0.0);
-    final currentSums = List<double>.filled(7, 0.0);
-    final counts = List<int>.filled(7, 0);
-
-    for (final point in points) {
-      final local = point.timestamp.toLocal();
-      final weekdayIndex = local.weekday - 1;
-      powerSums[weekdayIndex] += point.powerW;
-      voltageSums[weekdayIndex] += point.voltageV;
-      currentSums[weekdayIndex] += point.currentA;
-      counts[weekdayIndex] += 1;
-    }
-
-    final energyByWeekday = aggregatePositiveEnergyDeltasTotal(
-      points: points,
-      bucketCount: 7,
-      bucketForPoint: (point) => point.timestamp.toLocal().weekday - 1,
+  List<GroupedBucket> buildDailyBuckets(
+      List<AnalyticsPoint> points,
+      DateTimeRange range,
+      ) {
+    final start = DateTime(
+      range.start.year,
+      range.start.month,
+      range.start.day,
+    );
+    final end = DateTime(
+      range.end.year,
+      range.end.month,
+      range.end.day,
     );
 
-    return List.generate(7, (index) {
+    final totalDays = end.difference(start).inDays + 1;
+    final powerSums = List<double>.filled(totalDays, 0.0);
+    final voltageSums = List<double>.filled(totalDays, 0.0);
+    final currentSums = List<double>.filled(totalDays, 0.0);
+    final counts = List<int>.filled(totalDays, 0);
+
+    int bucketForPoint(AnalyticsPoint point) {
+      final localDay = DateTime(
+        point.timestamp.toLocal().year,
+        point.timestamp.toLocal().month,
+        point.timestamp.toLocal().day,
+      );
+      return localDay.difference(start).inDays;
+    }
+
+    for (final point in points) {
+      final bucket = bucketForPoint(point);
+      if (bucket < 0 || bucket >= totalDays) continue;
+
+      powerSums[bucket] += point.powerW;
+      voltageSums[bucket] += point.voltageV;
+      currentSums[bucket] += point.currentA;
+      counts[bucket] += 1;
+    }
+
+    final energyTotals = aggregatePositiveEnergyDeltasTotal(
+      points: points,
+      bucketCount: totalDays,
+      bucketForPoint: (point) {
+        final bucket = bucketForPoint(point);
+        if (bucket < 0 || bucket >= totalDays) return null;
+        return bucket;
+      },
+    );
+
+    return List.generate(totalDays, (index) {
+      final day = start.add(Duration(days: index));
       final count = counts[index];
+
       return GroupedBucket(
-        label: labels[index],
-        timestamp: null,
+        label: '${two(day.day)}/${two(day.month)}',
+        timestamp: day,
         power: count == 0 ? 0.0 : powerSums[index] / count,
         voltage: count == 0 ? 0.0 : voltageSums[index] / count,
         current: count == 0 ? 0.0 : currentSums[index] / count,
-        energy: energyByWeekday[index],
+        energy: energyTotals[index],
       );
     });
   }
@@ -297,25 +324,41 @@ class AnalyticsChart extends StatelessWidget {
       List<AnalyticsPoint> points,
       DateTimeRange range,
       ) {
-    final totalDays = range.end.difference(range.start).inDays + 1;
-    final desiredBuckets = totalDays <= 10 ? totalDays : 10;
-    final bucketCount = math.max(1, desiredBuckets);
+    final start = DateTime(
+      range.start.year,
+      range.start.month,
+      range.start.day,
+    );
+    final end = DateTime(
+      range.end.year,
+      range.end.month,
+      range.end.day,
+      23,
+      59,
+      59,
+      999,
+    );
 
+    final totalDays = end.difference(start).inDays + 1;
+
+    if (totalDays <= 14) {
+      return buildDailyBuckets(points, range);
+    }
+
+    final bucketCount = math.min(10, totalDays);
     final powerSums = List<double>.filled(bucketCount, 0.0);
     final voltageSums = List<double>.filled(bucketCount, 0.0);
     final currentSums = List<double>.filled(bucketCount, 0.0);
     final counts = List<int>.filled(bucketCount, 0);
 
-    final totalMillis = math.max(1,
-      range.end.millisecondsSinceEpoch - range.start.millisecondsSinceEpoch,
-    );
-
     int bucketForTimestamp(DateTime timestamp) {
-      final millis = timestamp.millisecondsSinceEpoch.clamp(
-        range.start.millisecondsSinceEpoch,
-        range.end.millisecondsSinceEpoch,
+      final localDay = DateTime(
+        timestamp.toLocal().year,
+        timestamp.toLocal().month,
+        timestamp.toLocal().day,
       );
-      final ratio = (millis - range.start.millisecondsSinceEpoch) / totalMillis;
+      final dayOffset = localDay.difference(start).inDays.clamp(0, totalDays - 1);
+      final ratio = dayOffset / math.max(1, totalDays);
       return math.min(bucketCount - 1, (ratio * bucketCount).floor());
     }
 
@@ -334,12 +377,17 @@ class AnalyticsChart extends StatelessWidget {
     );
 
     return List.generate(bucketCount, (index) {
-      final sliceStart = range.start.add(
-        Duration(milliseconds: ((totalMillis / bucketCount) * index).round()),
-      );
+      final startDayOffset = ((totalDays / bucketCount) * index).floor();
+      final endDayOffset =
+      math.min(totalDays - 1, ((totalDays / bucketCount) * (index + 1)).ceil() - 1);
 
-      final label = '${two(sliceStart.day)}/${two(sliceStart.month)}';
+      final sliceStart = start.add(Duration(days: startDayOffset));
+      final sliceEnd = start.add(Duration(days: endDayOffset));
       final count = counts[index];
+
+      final label = sliceStart.day == sliceEnd.day && sliceStart.month == sliceEnd.month
+          ? '${two(sliceStart.day)}/${two(sliceStart.month)}'
+          : '${two(sliceStart.day)}/${two(sliceStart.month)}-${two(sliceEnd.day)}/${two(sliceEnd.month)}';
 
       return GroupedBucket(
         label: label,
@@ -582,13 +630,13 @@ class GroupedHistogramPainter extends CustomPainter {
       final shouldPaintLabel = _shouldPaintLabel(i, buckets.length, mode);
       if (!shouldPaintLabel) continue;
 
-      final labelWidth = bucketWidth.clamp(20.0, 40.0);
+      final labelWidth = bucketWidth.clamp(24.0, 54.0);
 
       final tp = TextPainter(
         text: TextSpan(
           text: bucket.label,
           style: textStyle.copyWith(
-            fontSize: mode == AnalyticsChartMode.weekDays ? 10 : textStyle.fontSize,
+            fontSize: mode == AnalyticsChartMode.weekDays ? 9 : textStyle.fontSize,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -628,7 +676,8 @@ class GroupedHistogramPainter extends CustomPainter {
       case AnalyticsChartMode.todayBands:
         return true;
       case AnalyticsChartMode.weekDays:
-        return true;
+        if (total <= 8) return true;
+        return index.isEven || index == total - 1;
       case AnalyticsChartMode.rangePeriods:
         if (total <= 6) return true;
         return index % 2 == 0 || index == total - 1;
@@ -692,8 +741,7 @@ class AggregateLinePainter extends CustomPainter {
     final maxValue = values.fold<double>(0, math.max);
     final minValue = values.fold<double>(double.infinity, math.min);
     final safeMinValue = minValue == double.infinity ? 0.0 : minValue;
-    final valueRange = (maxValue - safeMinValue).abs() < 0.0001
-        ? math.max(1.0, maxValue) : (maxValue - safeMinValue);
+    final valueRange = (maxValue - safeMinValue).abs() < 0.0001 ? math.max(1.0, maxValue) : (maxValue - safeMinValue);
 
     final gridPaint = Paint()..color = gridColor..strokeWidth = 1;
 
@@ -753,13 +801,9 @@ class AggregateLinePainter extends CustomPainter {
       );
     }
 
-    final bool isTodayBands = mode == AnalyticsChartMode.todayBands;
-
-    final labelWidth = isTodayBands
-        ? (chartRect.width / buckets.length).clamp(28.0, 34.0)
-        : buckets.length <= 1
+    final labelWidth = buckets.length <= 1
         ? 40.0
-        : (chartRect.width / buckets.length).clamp(20.0, 40.0);
+        : (chartRect.width / buckets.length).clamp(24.0, 54.0);
 
     for (int i = 0; i < buckets.length; i++) {
       final shouldPaintLabel = _shouldPaintLabel(i, buckets.length, mode);
@@ -770,9 +814,7 @@ class AggregateLinePainter extends CustomPainter {
         text: TextSpan(
           text: label,
           style: textStyle.copyWith(
-            fontSize: isTodayBands
-                ? 9 : mode == AnalyticsChartMode.weekDays
-                ? 10 : textStyle.fontSize,
+            fontSize: mode == AnalyticsChartMode.weekDays ? 9 : textStyle.fontSize,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -785,7 +827,7 @@ class AggregateLinePainter extends CustomPainter {
         chartRect.right - labelWidth,
       );
 
-      tp.paint(canvas, Offset(dx, chartRect.bottom + (isTodayBands ? 10 : 8)));
+      tp.paint(canvas, Offset(dx, chartRect.bottom + 8));
     }
   }
 
@@ -798,7 +840,8 @@ class AggregateLinePainter extends CustomPainter {
       case AnalyticsChartMode.todayBands:
         return true;
       case AnalyticsChartMode.weekDays:
-        return true;
+        if (total <= 8) return true;
+        return index.isEven || index == total - 1;
       case AnalyticsChartMode.rangePeriods:
         if (total <= 6) return true;
         return index % 2 == 0 || index == total - 1;
@@ -1005,7 +1048,6 @@ class RealtimeAggregateLinePainter extends CustomPainter {
 
   void drawXLabels(Canvas canvas, Rect chartRect, List<DateTime> ticks,
       double axisStartMs, double axisRangeMs) {
-
     for (final tick in ticks) {
       final x = xForDate(tick, chartRect, axisStartMs, axisRangeMs);
 
@@ -1050,18 +1092,9 @@ class LegendRow extends StatelessWidget {
       spacing: 12,
       runSpacing: 8,
       children: [
-        LegendChip(
-          color: Color(0xFF2563EB),
-          label: 'Potencia',
-        ),
-        LegendChip(
-          color: Color(0xFF7C3AED),
-          label: 'Voltaje',
-        ),
-        LegendChip(
-          color: Color(0xFF14B8A6),
-          label: 'Corriente',
-        ),
+        LegendItem(color: GroupedHistogramPainter.powerColor, label: 'Potencia'),
+        LegendItem(color: GroupedHistogramPainter.voltageColor, label: 'Voltaje'),
+        LegendItem(color: GroupedHistogramPainter.currentColor, label: 'Corriente'),
       ],
     );
   }
@@ -1078,21 +1111,18 @@ class AggregateLegendRow extends StatelessWidget {
       spacing: 12,
       runSpacing: 8,
       children: [
-        LegendChip(
+        LegendItem(
           color: const Color(0xFF2563EB),
-          label: mode == AnalyticsChartMode.currentMoment
-              ? 'Potencia en seguimiento'
-              : mode == AnalyticsChartMode.todayBands
-              ? 'Media Wh por franja'
-              : 'Consumo',
+          label: mode == AnalyticsChartMode.currentMoment ? 'Potencia' : 'Consumo',
         ),
       ],
     );
   }
 }
 
-class LegendChip extends StatelessWidget {
-  const LegendChip({super.key,
+class LegendItem extends StatelessWidget {
+  const LegendItem({
+    super.key,
     required this.color,
     required this.label,
   });
@@ -1106,11 +1136,11 @@ class LegendChip extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 9,
-          height: 9,
+          width: 8,
+          height: 8,
           decoration: BoxDecoration(
             color: color,
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(99),
           ),
         ),
         const SizedBox(width: 8),
@@ -1137,28 +1167,10 @@ class ModeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? scheme.primary.withValues(alpha: 0.10) : scheme.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? scheme.primary : scheme.outlineVariant,
-          ),
-        ),
-        child: Text(label,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: selected ? scheme.primary : scheme.onSurface,
-          ),
-        ),
-      ),
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
     );
   }
 }

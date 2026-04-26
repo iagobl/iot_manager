@@ -18,16 +18,37 @@ class DeviceReadingsRemoteDatasource with DeviceDatasourceShared {
         );
       }
 
-      final response = await client.from('readings')
-          .select('ts, power_w, voltage_v, energy_wh')
-          .eq('device_id', normalizedDeviceId)
-          .gte('ts', from.toUtc().toIso8601String())
-          .lte('ts', to.toUtc().toIso8601String())
-          .order('ts', ascending: true)
-          .limit(limit);
+      const pageSize = 1000; // Límite de Supabase
+      final allRows = <Map<String, dynamic>>[];
+      int offset = 0;
+      int consecutiveEmptyPages = 0;
+      const maxConsecutiveEmptyPages = 3;
 
-      return (response as List)
-          .map((item) => Map<String, dynamic>.from(item as Map)).toList();
+      while (allRows.length < limit && consecutiveEmptyPages < maxConsecutiveEmptyPages) {
+        final response = await client.from('readings')
+            .select('ts, power_w, voltage_v, energy_wh')
+            .eq('device_id', normalizedDeviceId)
+            .gte('ts', from.toUtc().toIso8601String())
+            .lte('ts', to.toUtc().toIso8601String())
+            .order('ts', ascending: true)
+            .range(offset, offset + pageSize - 1);
+
+        final rows = (response as List)
+            .map((item) => Map<String, dynamic>.from(item as Map))
+            .toList();
+
+        if (rows.isEmpty) {
+          consecutiveEmptyPages++;
+          break;
+        } else {
+          consecutiveEmptyPages = 0;
+        }
+
+        allRows.addAll(rows);
+        offset += pageSize;
+      }
+
+      return allRows;
     } catch (error) {
       throw ErrorMapper.mapException(error);
     }

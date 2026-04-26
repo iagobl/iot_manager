@@ -284,14 +284,13 @@ class AnalyticsController extends ChangeNotifier {
   }
 
   DateTime resolveRangeStart(AnalyticsRangePreset preset, DateTime now) {
+    final todayStart = DateTime(now.year, now.month, now.day);
+
     switch (preset) {
       case AnalyticsRangePreset.today:
-        return DateTime(now.year, now.month, now.day);
+        return todayStart;
       case AnalyticsRangePreset.last7Days:
-        final weekday = now.weekday;
-        return DateTime(now.year, now.month, now.day).subtract(Duration(days: weekday - 1));
-      case AnalyticsRangePreset.last30Days:
-        return DateTime(now.year, now.month, 1);
+        return todayStart.subtract(const Duration(days: 6));
       case AnalyticsRangePreset.custom:
         return _state.from;
     }
@@ -301,7 +300,6 @@ class AnalyticsController extends ChangeNotifier {
     switch (preset) {
       case AnalyticsRangePreset.today:
       case AnalyticsRangePreset.last7Days:
-      case AnalyticsRangePreset.last30Days:
         return now;
       case AnalyticsRangePreset.custom:
         return _state.to;
@@ -313,9 +311,7 @@ class AnalyticsController extends ChangeNotifier {
       case AnalyticsRangePreset.today:
         return 'Hoy';
       case AnalyticsRangePreset.last7Days:
-        return 'Semana actual';
-      case AnalyticsRangePreset.last30Days:
-        return 'Este mes';
+        return 'Últimos 7 días';
       case AnalyticsRangePreset.custom:
         return formatRange(_state.from, _state.to);
     }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:iot_manager/core/widgets/app_page_background.dart';
 import 'package:iot_manager/features/analytics/domain/entities/analytics_models.dart';
 import 'package:iot_manager/features/analytics/presentation/controllers/analytics_controller.dart';
 import 'package:iot_manager/features/analytics/presentation/widgets/analytics_chart.dart';
@@ -15,8 +14,8 @@ class AnalyticsPage extends StatefulWidget {
 
 class AnalyticsPageState extends State<AnalyticsPage> {
   late final AnalyticsController controller;
-  AnalyticsChartMode todayMode = AnalyticsChartMode.currentMoment;
-  bool filtersExpanded = true;
+  AnalyticsChartMode todayMode = AnalyticsChartMode.todayBands;
+  bool filtersExpanded = false;
 
   @override
   void initState() {
@@ -115,8 +114,6 @@ class AnalyticsPageState extends State<AnalyticsPage> {
         return todayMode;
       case AnalyticsRangePreset.last7Days:
         return AnalyticsChartMode.weekDays;
-      case AnalyticsRangePreset.last30Days:
-        return AnalyticsChartMode.rangePeriods;
       case AnalyticsRangePreset.custom:
         final days = state.to.difference(state.from).inDays + 1;
         if (days <= 1) {
@@ -135,88 +132,94 @@ class AnalyticsPageState extends State<AnalyticsPage> {
     final state = controller.state;
     final chartMode = resolveChartMode(state);
     final showTodayModes = state.rangePreset == AnalyticsRangePreset.today;
-    final chartSeries = chartMode == AnalyticsChartMode.currentMoment
-        ? controller.currentMomentChartSeries : state.series;
 
-    return AppPageBackground(
-      variant: AppPageBackgroundVariant.homeSoft,
-      child: RefreshIndicator(
-        onRefresh: controller.refresh,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
-          children: [
-            HeroCard(
-              scopeLabel: state.selectedScope?.label ?? 'Sin seleccionar',
-              rangeLabel: controller.rangeLabel(),
-              exporting: state.exporting,
-              onExport: () => controller.exportPdf(context),
-            ),
-            const SizedBox(height: 16),
-            FiltersCard(
-              controller: controller,
-              state: state,
-              expanded: filtersExpanded,
-              onToggleExpanded: () {
-                setState(() {
-                  filtersExpanded = !filtersExpanded;
-                });
-              },
-              onCustomRangeTap: pickCustomRange,
-            ),
-            const SizedBox(height: 18),
-            const SectionDivider(label: 'Resumen del periodo'),
-            const SizedBox(height: 18),
-            if (state.loading && state.series.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(top: 60),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (state.errorMessage != null && state.series.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: scheme.errorContainer,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Text(
-                  state.errorMessage!,
-                  style: TextStyle(color: scheme.onErrorContainer),
-                ),
-              )
-            else ...[
-                analytics_widgets.AnalyticsSummary(
-                  series: state.series,
-                  currentPowerW: controller.currentPowerW,
-                  totalConsumptionWh: controller.rangeConsumptionWh,
-                  averagePowerW: controller.displayAveragePowerW,
-                  peakPowerW: controller.displayPeakPowerW,
-                  isOn: controller.isCurrentlyOn,
-                ),
-                const SizedBox(height: 18),
-                AnalyticsChart(
-                  series: chartSeries,
-                  range: DateTimeRange(start: state.from, end: state.to),
-                  mode: chartMode,
-                  showTodayModeSelector: showTodayModes,
-                  onModeChanged: (value) {
-                    setState(() {
-                      todayMode = value;
-                    });
-                  },
-                  normalizationLimits: state.normalizationLimits,
-                  aggregateMode: state.selectedGroup == AnalyticsScopeGroup.global,
-                ),
-              ],
-          ],
+    final chartSeries = chartMode == AnalyticsChartMode.currentMoment
+        ? (controller.currentMomentChartSeries.isEmpty
+        ? state.series
+        : controller.currentMomentChartSeries)
+        : state.series;
+
+    return Stack(
+      children: [
+        RefreshIndicator(
+          onRefresh: controller.refresh,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
+            children: [
+              HeroCard(
+                scopeLabel: state.selectedScope?.label ?? 'Sin seleccionar',
+                rangeLabel: controller.rangeLabel(),
+                exporting: state.exporting,
+                onExport: () => controller.exportPdf(context),
+              ),
+              const SizedBox(height: 16),
+              FiltersCard(
+                controller: controller,
+                state: state,
+                expanded: filtersExpanded,
+                onToggleExpanded: () {
+                  setState(() {
+                    filtersExpanded = !filtersExpanded;
+                  });
+                },
+                onCustomRangeTap: pickCustomRange,
+              ),
+              const SizedBox(height: 18),
+              const SectionDivider(label: 'Resumen del periodo'),
+              const SizedBox(height: 18),
+              if (state.loading && state.series.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 60),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (state.errorMessage != null && state.series.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: scheme.errorContainer,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Text(
+                    state.errorMessage!,
+                    style: TextStyle(color: scheme.onErrorContainer),
+                  ),
+                )
+              else ...[
+                  analytics_widgets.AnalyticsSummary(
+                    series: state.series,
+                    currentPowerW: controller.currentPowerW,
+                    totalConsumptionWh: controller.rangeConsumptionWh,
+                    averagePowerW: controller.displayAveragePowerW,
+                    peakPowerW: controller.displayPeakPowerW,
+                    isOn: controller.isCurrentlyOn,
+                  ),
+                  const SizedBox(height: 18),
+                  AnalyticsChart(
+                    series: chartSeries,
+                    range: DateTimeRange(start: state.from, end: state.to),
+                    mode: chartMode,
+                    showTodayModeSelector: showTodayModes,
+                    onModeChanged: (value) {
+                      setState(() {
+                        todayMode = value;
+                      });
+                    },
+                    normalizationLimits: state.normalizationLimits,
+                    aggregateMode: state.selectedGroup == AnalyticsScopeGroup.global,
+                  ),
+                ],
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
 
 class FiltersCard extends StatelessWidget {
-  const FiltersCard({super.key,
+  const FiltersCard({
+    super.key,
     required this.controller,
     required this.state,
     required this.expanded,
@@ -327,12 +330,11 @@ class FiltersCard extends StatelessWidget {
                   initialValue: selectedScopeId,
                   decoration: InputDecoration(
                     labelText: state.selectedGroup == AnalyticsScopeGroup.device
-                        ? 'Selecciona dispositivo' : 'Selecciona conjunto',
+                        ? 'Dispositivo'
+                        : 'Conjunto',
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(18),
                     ),
-                    filled: true,
-                    fillColor: scheme.surfaceContainerLowest,
                   ),
                   items: visibleScopes.map((scope) => DropdownMenuItem<String>(
                       value: scope.id,
@@ -348,37 +350,29 @@ class FiltersCard extends StatelessWidget {
                 const SizedBox(height: 18),
                 const SectionLabel(label: 'Rango temporal'),
                 const SizedBox(height: 12),
-                Row(
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
                   children: [
-                    Expanded(
-                      child: RangeChip(
-                        label: 'Hoy',
-                        selected: state.rangePreset == AnalyticsRangePreset.today,
-                        onTap: () => controller.selectRangePreset(
-                          AnalyticsRangePreset.today,
-                        ),
+                    RangeChip(
+                      label: 'Hoy',
+                      selected: state.rangePreset == AnalyticsRangePreset.today,
+                      onTap: () => controller.selectRangePreset(
+                        AnalyticsRangePreset.today,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: RangeChip(
-                        label: 'Semana actual',
-                        selected:
-                        state.rangePreset == AnalyticsRangePreset.last7Days,
-                        onTap: () => controller.selectRangePreset(
-                          AnalyticsRangePreset.last7Days,
-                        ),
+                    RangeChip(
+                      label: '7 días',
+                      selected:
+                      state.rangePreset == AnalyticsRangePreset.last7Days,
+                      onTap: () => controller.selectRangePreset(
+                        AnalyticsRangePreset.last7Days,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: RangeChip(
-                        label: 'Personalizado',
-                        selected: state.rangePreset == AnalyticsRangePreset.custom,
-                        onTap: () async {
-                          await onCustomRangeTap();
-                        },
-                      ),
+                    RangeChip(
+                      label: 'Personalizado',
+                      selected: state.rangePreset == AnalyticsRangePreset.custom,
+                      onTap: onCustomRangeTap,
                     ),
                   ],
                 ),
@@ -392,12 +386,109 @@ class FiltersCard extends StatelessWidget {
   }
 }
 
+class HeroCard extends StatelessWidget {
+  const HeroCard({
+    super.key,
+    required this.scopeLabel,
+    required this.rangeLabel,
+    required this.exporting,
+    required this.onExport,
+  });
+
+  final String scopeLabel;
+  final String rangeLabel;
+  final bool exporting;
+  final VoidCallback onExport;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            scheme.primary,
+            scheme.primary.withValues(alpha: 0.82),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.primary.withValues(alpha: 0.18),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: DefaultTextStyle(
+              style: TextStyle(color: scheme.onPrimary),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Análisis de consumo',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: scheme.onPrimary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    scopeLabel,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: scheme.onPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    rangeLabel,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: scheme.onPrimary.withValues(alpha: 0.90),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          FilledButton.tonalIcon(
+            onPressed: exporting ? null : onExport,
+            icon: exporting
+                ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+                : const Icon(Icons.picture_as_pdf_rounded),
+            label: Text(exporting ? 'Exportando' : 'PDF'),
+            style: FilledButton.styleFrom(
+              backgroundColor:
+              scheme.onPrimary.withValues(alpha: 0.14),
+              foregroundColor: scheme.onPrimary,
+              padding:
+              const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class ScopeGroupCard extends StatelessWidget {
-  const ScopeGroupCard({super.key,
+  const ScopeGroupCard({
+    super.key,
     required this.title,
     required this.selected,
     required this.enabled,
-    this.onTap,
+    required this.onTap,
   });
 
   final String title;
@@ -409,256 +500,48 @@ class ScopeGroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    final backgroundColor = !enabled
-        ? scheme.surfaceContainerHighest.withValues(alpha: 0.35)
-        : selected
-        ? scheme.primary.withValues(alpha: 0.10)
-        : scheme.surfaceContainerLowest;
+    final bgColor = selected
+        ? scheme.primaryContainer
+        : scheme.surfaceContainerHighest.withValues(
+      alpha: enabled ? 0.75 : 0.45,
+    );
 
-    final borderColor = !enabled
-        ? scheme.outlineVariant.withValues(alpha: 0.35)
-        : selected
-        ? scheme.primary.withValues(alpha: 0.55)
-        : scheme.outlineVariant.withValues(alpha: 0.55);
+    final fgColor = selected
+        ? scheme.onPrimaryContainer
+        : scheme.onSurface.withValues(
+      alpha: enabled ? 0.90 : 0.45,
+    );
 
-    final foregroundColor = !enabled
-        ? scheme.onSurfaceVariant.withValues(alpha: 0.50)
-        : selected
-        ? scheme.primary
-        : scheme.onSurface;
-
-    return InkWell(
-      onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: borderColor),
-        ),
-        child: Row(
-          children: [
-            Icon(selected ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
-              size: 20,
-              color: foregroundColor,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(title,
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 180),
+      opacity: enabled ? 1 : 0.65,
+      child: Material(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+            child: Center(
+              child: Text(
+                title,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: foregroundColor,
-                  fontWeight: FontWeight.w700,
+                  color: fgColor,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class SectionLabel extends StatelessWidget {
-  const SectionLabel({super.key, required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Text(label,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.w800,
-        color: scheme.onSurface,
-      ),
-    );
-  }
-}
-
-class SectionDivider extends StatelessWidget {
-  const SectionDivider({super.key, required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 1,
-            color: scheme.outlineVariant.withValues(alpha: 0.7),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(label,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Container(
-            height: 1,
-            color: scheme.outlineVariant.withValues(alpha: 0.7),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class HeroCard extends StatelessWidget {
-  const HeroCard({super.key,
-    required this.scopeLabel,
-    required this.rangeLabel,
-    required this.exporting,
-    required this.onExport,
-  });
-
-  final String scopeLabel;
-  final String rangeLabel;
-  final bool exporting;
-  final Future<void> Function() onExport;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            scheme.primary.withValues(alpha: 0.14),
-            scheme.surface.withValues(alpha: 0.94),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: scheme.primary.withValues(alpha: 0.16)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: scheme.primary.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(Icons.query_stats_rounded, color: scheme.primary),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Centro analítico',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text('Comparativa visual del consumo agrupada por periodos temporales.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              InfoChip(icon: Icons.layers_rounded, label: scopeLabel),
-              InfoChip(icon: Icons.schedule_rounded, label: rangeLabel),
-              const InfoChip(
-                  icon: Icons.bar_chart_rounded,
-                  label: 'Histograma comparativo'
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: exporting ? null : onExport,
-            icon: exporting ? SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  scheme.onPrimary,
-                ),
-              ),
-            ) : const Icon(Icons.picture_as_pdf_outlined),
-            label: Text(exporting ? 'Generando PDF...' : 'Exportar informe PDF'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 14,
-              ),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class InfoChip extends StatelessWidget {
-  const InfoChip({super.key,
-    required this.icon,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: scheme.surface.withValues(alpha: 0.84),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.60)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: scheme.primary),
-          const SizedBox(width: 8),
-          Text(label,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
       ),
     );
   }
 }
 
 class RangeChip extends StatelessWidget {
-  const RangeChip({super.key,
+  const RangeChip({
+    super.key,
     required this.label,
     required this.selected,
     required this.onTap,
@@ -672,37 +555,87 @@ class RangeChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return InkWell(
-      onTap: onTap,
+    return Material(
+      color: selected
+          ? scheme.primaryContainer
+          : scheme.surface.withValues(alpha: 0.95),
       borderRadius: BorderRadius.circular(14),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        height: 52,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? scheme.primary.withValues(alpha: 0.14)
-              : scheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected
-              ? scheme.primary.withValues(alpha: 0.50)
-              : scheme.outlineVariant.withValues(alpha: 0.75),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected) ...[
+                Icon(
+                  Icons.check_rounded,
+                  size: 16,
+                  color: scheme.onPrimaryContainer,
+                ),
+                const SizedBox(width: 8),
+              ],
+              Text(label,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: selected
+                      ? scheme.onPrimaryContainer
+                      : scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
-          boxShadow: selected ? [BoxShadow(
-              color: scheme.primary.withValues(alpha: 0.10),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ] : null,
         ),
-        child: Text(label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: selected ? scheme.primary : scheme.onSurface,
+      ),
+    );
+  }
+}
+
+class SectionDivider extends StatelessWidget {
+  const SectionDivider({
+    super.key,
+    required this.label,
+  });
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Row(
+      children: [
+        Text(label,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
           ),
         ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: scheme.outlineVariant.withValues(alpha: 0.55),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class SectionLabel extends StatelessWidget {
+  const SectionLabel({
+    super.key,
+    required this.label,
+  });
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(label,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+        fontWeight: FontWeight.w800,
       ),
     );
   }

@@ -145,17 +145,162 @@ class AnalyticsRemoteDatasource {
     try {
       if (deviceIds.isEmpty) return <Map<String, dynamic>>[];
 
-      final response = await client.from('readings')
-          .select('device_id, ts, power_w, voltage_v, current_a, energy_wh, meta')
-          .inFilter('device_id', deviceIds)
-          .gte('ts', from.toUtc().toIso8601String())
-          .lte('ts', to.toUtc().toIso8601String())
-          .order('ts', ascending: true).limit(limit);
+      final candidateTimestampColumns = <String>[
+        'ts',
+        'created_at',
+        'recorded_at',
+        'timestamp',
+        'measured_at',
+        'inserted_at',
+      ];
 
-      return (response as List).map((item) => Map<String, dynamic>.from(item as Map)).toList();
+      for (final timestampColumn in candidateTimestampColumns) {
+        try {
+          return await _fetchReadingsWithPagination(
+            deviceIds: deviceIds,
+            from: from,
+            to: to,
+            timestampColumn: timestampColumn,
+            limit: limit,
+          );
+        } catch (_) {
+        }
+      }
+
+      final allRows = await _fetchAllReadingsWithPagination(
+        deviceIds: deviceIds,
+        limit: limit,
+      );
+
+      bool inRange(DateTime timestamp) {
+        return !timestamp.isBefore(from) && !timestamp.isAfter(to);
+      }
+
+      allRows.removeWhere((row) {
+        final timestamp = extractTimestamp(row);
+        return timestamp == null || !inRange(timestamp);
+      });
+
+      allRows.sort((a, b) {
+        final aTs = extractTimestamp(a) ?? from;
+        final bTs = extractTimestamp(b) ?? from;
+        return aTs.compareTo(bTs);
+      });
+
+      if (allRows.length > limit) {
+        return allRows.sublist(0, limit);
+      }
+
+      return allRows;
     } catch (error) {
       throw ErrorMapper.mapException(error);
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchReadingsWithPagination({
+    required List<String> deviceIds,
+    required DateTime from,
+    required DateTime to,
+    required String timestampColumn,
+    int limit = 30000,
+  }) async {
+    const pageSize = 1000; // Límite de Supabase
+    final allRows = <Map<String, dynamic>>[];
+    int offset = 0;
+    int consecutiveEmptyPages = 0;
+    const maxConsecutiveEmptyPages = 3;
+
+    while (allRows.length < limit && consecutiveEmptyPages < maxConsecutiveEmptyPages) {
+      final response = await client
+          .from('readings')
+          .select('*')
+          .inFilter('device_id', deviceIds)
+          .gte(timestampColumn, from.toUtc().toIso8601String())
+          .lte(timestampColumn, to.toUtc().toIso8601String())
+          .order(timestampColumn, ascending: true)
+          .range(offset, offset + pageSize - 1);
+
+      final rows = (response as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+
+      if (rows.isEmpty) {
+        consecutiveEmptyPages++;
+        break;
+      } else {
+        consecutiveEmptyPages = 0;
+      }
+
+      allRows.addAll(rows);
+      offset += pageSize;
+    }
+
+    return allRows;
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchAllReadingsWithPagination({
+    required List<String> deviceIds,
+    int limit = 30000,
+  }) async {
+    const pageSize = 1000; // Límite de Supabase
+    final allRows = <Map<String, dynamic>>[];
+    int offset = 0;
+    int consecutiveEmptyPages = 0;
+    const maxConsecutiveEmptyPages = 3;
+
+    while (allRows.length < limit && consecutiveEmptyPages < maxConsecutiveEmptyPages) {
+      final response = await client
+          .from('readings')
+          .select('*')
+          .inFilter('device_id', deviceIds)
+          .range(offset, offset + pageSize - 1);
+
+      final rows = (response as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+
+      if (rows.isEmpty) {
+        consecutiveEmptyPages++;
+        break;
+      } else {
+        consecutiveEmptyPages = 0;
+      }
+
+      allRows.addAll(rows);
+      offset += pageSize;
+    }
+
+    return allRows;
+  }
+
+  DateTime? extractTimestamp(Map<String, dynamic> row) {
+    const candidates = <String>[
+      'ts',
+      'created_at',
+      'recorded_at',
+      'timestamp',
+      'measured_at',
+      'inserted_at',
+    ];
+
+    for (final key in candidates) {
+      final raw = row[key];
+      if (raw == null) continue;
+      final parsed = DateTime.tryParse(raw.toString());
+      if (parsed != null) return parsed.toLocal();
+    }
+
+    final meta = row['meta'];
+    if (meta is Map) {
+      for (final key in candidates) {
+        final raw = meta[key];
+        if (raw == null) continue;
+        final parsed = DateTime.tryParse(raw.toString());
+        if (parsed != null) return parsed.toLocal();
+      }
+    }
+
+    return null;
   }
 
   Future<AnalyticsNormalizationLimits> getDeviceNormalizationLimits(
