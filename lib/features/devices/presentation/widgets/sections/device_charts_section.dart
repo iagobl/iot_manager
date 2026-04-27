@@ -69,18 +69,6 @@ class DeviceChartsSectionState extends State<DeviceChartsSection>
       );
   }
 
-  Future<void> onExportPdf() async {
-    try {
-      await controller.exportCompleteReportPdf(
-        deviceName: widget.deviceName,
-        deviceHost: widget.deviceHost,
-      );
-
-      showMessage('Informe PDF generado correctamente.');
-    } catch (_) {
-      showMessage(controller.errorMessage ?? 'No se pudo generar el informe PDF.');
-    }
-  }
 
   Future<void> onRefresh() async {
     await controller.reload();
@@ -127,13 +115,11 @@ class DeviceChartsSectionState extends State<DeviceChartsSection>
             metric: controller.metric,
             range: controller.range,
           ),
-          const SizedBox(height: 14),
-          SelectorCard(
-            metric: controller.metric,
-            exportingPdf: controller.exportingPdf,
-            onMetricChanged: onMetricChanged,
-            onExportPdf: onExportPdf,
-          ),
+           const SizedBox(height: 14),
+           SelectorCard(
+             metric: controller.metric,
+             onMetricChanged: onMetricChanged,
+           ),
           const SizedBox(height: 14),
           if (controller.loading && controller.rows.isEmpty)
             const ChartsLoadingState()
@@ -266,7 +252,7 @@ class ChartsHeroHeader extends StatelessWidget {
               const Expanded(
                 child: HeaderChip(
                   icon: Icons.sync_rounded,
-                  label: 'Automaticamente',
+                  label: 'Automatico',
                 ),
               ),
             ],
@@ -321,15 +307,11 @@ class SelectorCard extends StatelessWidget {
   const SelectorCard({
     super.key,
     required this.metric,
-    required this.exportingPdf,
     required this.onMetricChanged,
-    required this.onExportPdf,
   });
 
   final ChartMetric metric;
-  final bool exportingPdf;
   final ValueChanged<ChartMetric> onMetricChanged;
-  final Future<void> Function() onExportPdf;
 
   @override
   Widget build(BuildContext context) {
@@ -370,42 +352,11 @@ class SelectorCard extends StatelessWidget {
             ],
             onChanged: onMetricChanged,
           ),
-          const SizedBox(height: 16),
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: scheme.outlineVariant.withValues(alpha: 0.9),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: exportingPdf ? null : onExportPdf,
-              icon: exportingPdf ? SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(scheme.onPrimary),
-                ),
-              ) : const Icon(Icons.picture_as_pdf_outlined),
-              label: Text(exportingPdf ? 'Generando PDF...' : 'Exportar PDF'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+         ],
+       ),
+     );
+   }
+ }
 
 class SelectorColumn<T> extends StatelessWidget {
   const SelectorColumn({
@@ -578,9 +529,7 @@ class ChartSummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: scheme.outline.withValues(alpha: 0.10),
-        ),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.10)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -590,41 +539,30 @@ class ChartSummaryCard extends StatelessWidget {
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
-                          height: 1.1,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(subtitle,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    height: 1.05,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              LiveValueBadge(
-                label: 'Último valor',
-                value: formatChartValue(
-                  isConsumption ? total : latestValue,
-                  unit,
+              const SizedBox(width: 14),
+              SizedBox(
+                width: 112,
+                child: LiveValueBadge(
+                  label: 'Último valor',
+                  value: formatChartValue(
+                    isConsumption ? total : latestValue,
+                    unit,
+                  ),
                 ),
               ),
             ],
@@ -750,33 +688,36 @@ class StatCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.40),
+        color: scheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: scheme.outline.withValues(alpha: 0.08)),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
+            maxLines: 1,
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+              fontSize: 11,
               color: scheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: scheme.onSurface,
-              height: 1,
+          const SizedBox(height: 7),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+                height: 1,
+              ),
             ),
           ),
         ],
@@ -862,21 +803,21 @@ class LineChartCard extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(22),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: scheme.surfaceContainerLowest,
-                  ),
-                  child: CustomPaint(
-                    painter: SimpleLineChartPainter(
-                      data: data,
-                      scheme: scheme,
-                    ),
-                    child: const SizedBox.expand(),
-                  ),
-                ),
-              ),
+               child: ClipRRect(
+                 borderRadius: BorderRadius.circular(22),
+                 child: DecoratedBox(
+                   decoration: const BoxDecoration(
+                     color: Colors.white,
+                   ),
+                   child: CustomPaint(
+                     painter: SimpleLineChartPainter(
+                       data: data,
+                       scheme: scheme,
+                     ),
+                     child: const SizedBox.expand(),
+                   ),
+                 ),
+               ),
             ),
           ],
         )
@@ -933,13 +874,21 @@ class SimpleLineChartPainter extends CustomPainter {
       math.max(0, size.height - topPadding - bottomPadding),
     );
 
+    final backgroundPaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(chartRect, const Radius.circular(18)),
+      backgroundPaint,
+    );
+
     final gridPaint = Paint()
-      ..color = scheme.outlineVariant.withValues(alpha: 0.55)
+      ..color = scheme.outlineVariant.withValues(alpha: 0.35)
       ..strokeWidth = 1;
 
     final borderPaint = Paint()
-      ..color = scheme.outline.withValues(alpha: 0.22)
-      ..strokeWidth = 1;
+      ..color = scheme.outline.withValues(alpha: 0.12)
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
 
     final linePaint = Paint()
       ..color = scheme.primary
@@ -960,6 +909,7 @@ class SimpleLineChartPainter extends CustomPainter {
 
     for (final y in data.yLabels) {
       final yPos = _mapY(y, chartRect);
+
       canvas.drawLine(
         Offset(chartRect.left, yPos),
         Offset(chartRect.right, yPos),
@@ -977,6 +927,7 @@ class SimpleLineChartPainter extends CustomPainter {
 
     for (final x in data.xLabels) {
       final xPos = _mapX(x, chartRect);
+
       canvas.drawLine(
         Offset(xPos, chartRect.top),
         Offset(xPos, chartRect.bottom),
@@ -992,11 +943,15 @@ class SimpleLineChartPainter extends CustomPainter {
       );
     }
 
-    canvas.drawRect(chartRect, borderPaint);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(chartRect, const Radius.circular(18)),
+      borderPaint,
+    );
 
     if (data.points.isEmpty) return;
 
     final path = Path();
+
     for (var i = 0; i < data.points.length; i++) {
       final point = data.points[i];
       final dx = _mapX(point.time, chartRect);
@@ -1024,14 +979,16 @@ class SimpleLineChartPainter extends CustomPainter {
 
     final offsetMs = value.difference(data.axisStart).inMilliseconds;
     final ratio = (offsetMs / totalMs).clamp(0.0, 1.0);
+
     return rect.left + rect.width * ratio;
   }
 
   double _mapY(double value, Rect rect) {
     final minY = data.yLabels.isEmpty ? 0.0 : data.yLabels.first;
     final maxY = data.yLabels.isEmpty ? 1.0 : data.yLabels.last;
-    final span = (maxY - minY).abs() < 0.0001 ? 1.0 : (maxY - minY);
+    final span = (maxY - minY).abs() < 0.0001 ? 1.0 : maxY - minY;
     final ratio = ((value - minY) / span).clamp(0.0, 1.0);
+
     return rect.bottom - rect.height * ratio;
   }
 
