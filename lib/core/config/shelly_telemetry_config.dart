@@ -1,4 +1,4 @@
-import 'package:iot_manager/supabase_config.dart';
+import 'package:iot_manager/core/config/supabase_config.dart';
 
 class ShellyTelemetryConfig {
   static const String scriptName = 'tfg_iot_telemetry';
