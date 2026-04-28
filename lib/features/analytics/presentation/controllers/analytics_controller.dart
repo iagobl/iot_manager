@@ -168,12 +168,26 @@ class AnalyticsController extends ChangeNotifier {
   void registerLivePowerPoint(double totalPower) {
     final now = DateTime.now();
 
+    double totalCurrent = 0.0;
+    double totalVoltage = 0.0;
+
+    if (samples.isNotEmpty) {
+      final recentSamples = samples.where((sample) =>
+        now.difference(sample.timestamp).inMinutes <= 60
+      ).toList();
+
+      if (recentSamples.isNotEmpty) {
+        totalCurrent = recentSamples.fold<double>(0.0, (sum, sample) => sum + sample.currentA) / recentSamples.length;
+        totalVoltage = recentSamples.fold<double>(0.0, (sum, sample) => sum + sample.voltageV) / recentSamples.length;
+      }
+    }
+
     livePowerHistory.add(
       AnalyticsPoint(
         timestamp: now,
         powerW: totalPower,
-        voltageV: 0,
-        currentA: 0,
+        voltageV: totalVoltage,
+        currentA: totalCurrent,
         energyWh: 0,
       ),
     );
@@ -222,6 +236,30 @@ class AnalyticsController extends ChangeNotifier {
       _state.copyWith(
         selectedGroup: targetGroup,
         selectedScope: option,
+        series: const AnalyticsSeries(
+          points: [],
+          totalEnergyWh: 0,
+          averagePowerW: 0,
+          averageVoltageV: 0,
+          averageCurrentA: 0,
+          maxPowerW: 0,
+          maxVoltageV: 0,
+          maxCurrentA: 0,
+          minPowerW: 0,
+          minVoltageV: 0,
+          minCurrentA: 0,
+        ),
+        summary: const AnalyticsSummary(
+          totalEnergyWh: 0,
+          averagePowerW: 0,
+          averageVoltageV: 0,
+          averageCurrentA: 0,
+          peakPowerW: 0,
+          peakVoltageV: 0,
+          peakCurrentA: 0,
+          activeDevices: 0,
+          samples: 0,
+        ),
       ),
     );
 
@@ -342,20 +380,25 @@ class AnalyticsController extends ChangeNotifier {
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
     final powerValues = points.map((point) => point.powerW).toList();
-    final avgPower = powerValues.fold<double>(0.0, (sum, value) => sum + value) / powerValues.length;
+    final voltageValues = points.map((point) => point.voltageV).where((v) => v > 0).toList();
+    final currentValues = points.map((point) => point.currentA).where((v) => v > 0).toList();
+
+    final avgPower = powerValues.isNotEmpty ? powerValues.fold<double>(0.0, (sum, value) => sum + value) / powerValues.length : 0.0;
+    final avgVoltage = voltageValues.isNotEmpty ? voltageValues.fold<double>(0.0, (sum, value) => sum + value) / voltageValues.length : 0.0;
+    final avgCurrent = currentValues.isNotEmpty ? currentValues.fold<double>(0.0, (sum, value) => sum + value) / currentValues.length : 0.0;
 
     return AnalyticsSeries(
       points: points,
       totalEnergyWh: 0,
       averagePowerW: avgPower,
-      averageVoltageV: 0,
-      averageCurrentA: 0,
-      maxPowerW: powerValues.reduce(math.max),
-      maxVoltageV: 0,
-      maxCurrentA: 0,
-      minPowerW: powerValues.reduce(math.min),
-      minVoltageV: 0,
-      minCurrentA: 0,
+      averageVoltageV: avgVoltage,
+      averageCurrentA: avgCurrent,
+      maxPowerW: powerValues.isNotEmpty ? powerValues.reduce(math.max) : 0,
+      maxVoltageV: voltageValues.isNotEmpty ? voltageValues.reduce(math.max) : 0,
+      maxCurrentA: currentValues.isNotEmpty ? currentValues.reduce(math.max) : 0,
+      minPowerW: powerValues.isNotEmpty ? powerValues.reduce(math.min) : 0,
+      minVoltageV: voltageValues.isNotEmpty ? voltageValues.reduce(math.min) : 0,
+      minCurrentA: currentValues.isNotEmpty ? currentValues.reduce(math.min) : 0,
     );
   }
 

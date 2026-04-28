@@ -88,7 +88,7 @@ class AnalyticsChart extends StatelessWidget {
           Container(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
             decoration: BoxDecoration(
-              color: scheme.surfaceContainerLowest.withValues(alpha: 0.80),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
                 color: scheme.outlineVariant.withValues(alpha: 0.45)),
@@ -240,17 +240,71 @@ class AnalyticsChart extends StatelessWidget {
   }
 
   List<GroupedBucket> buildCurrentMoment(List<AnalyticsPoint> points) {
-    final sorted = [...points]..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    const maxVisibleBuckets = 12;
 
-    return sorted.map((point) {
-      final local = point.timestamp.toLocal();
+    final sorted = [...points]
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    if (sorted.isEmpty) return const [];
+
+    final visiblePoints = sorted.length <= 180
+        ? sorted
+        : sorted.sublist(sorted.length - 180);
+
+    if (visiblePoints.length <= maxVisibleBuckets) {
+      return visiblePoints.map((point) {
+        final local = point.timestamp.toLocal();
+
+        return GroupedBucket(
+          label: '${two(local.hour)}:${two(local.minute)}',
+          timestamp: local,
+          power: point.powerW,
+          voltage: point.voltageV,
+          current: point.currentA,
+          energy: point.energyWh,
+        );
+      }).toList();
+    }
+
+    final bucketCount = maxVisibleBuckets;
+    final grouped = List.generate(bucketCount, (_) => <AnalyticsPoint>[]);
+
+    for (int i = 0; i < visiblePoints.length; i++) {
+      final bucketIndex = ((i / visiblePoints.length) * bucketCount)
+          .floor()
+          .clamp(0, bucketCount - 1);
+
+      grouped[bucketIndex].add(visiblePoints[i]);
+    }
+
+    return grouped
+        .where((bucketPoints) => bucketPoints.isNotEmpty)
+        .map((bucketPoints) {
+      final first = bucketPoints.first.timestamp.toLocal();
+      final last = bucketPoints.last.timestamp.toLocal();
+
+      final powerAvg = bucketPoints
+          .map((e) => e.powerW)
+          .reduce((a, b) => a + b) /
+          bucketPoints.length;
+
+      final voltageAvg = bucketPoints
+          .map((e) => e.voltageV)
+          .reduce((a, b) => a + b) /
+          bucketPoints.length;
+
+      final currentAvg = bucketPoints
+          .map((e) => e.currentA)
+          .reduce((a, b) => a + b) /
+          bucketPoints.length;
+
       return GroupedBucket(
-        label: '${two(local.hour)}:${two(local.minute)}',
-        timestamp: local,
-        power: point.powerW,
-        voltage: point.voltageV,
-        current: point.currentA,
-        energy: point.energyWh,
+        label: '${two(first.hour)}:${two(first.minute)}',
+        timestamp: last,
+        power: powerAvg,
+        voltage: voltageAvg,
+        current: currentAvg,
+        energy: bucketPoints.last.energyWh,
       );
     }).toList();
   }
@@ -524,28 +578,107 @@ class GroupedHistogramPainter extends CustomPainter {
       size.height - topPadding - bottomPadding,
     );
 
-    final yTicks = const [0.0, 0.25, 0.5, 0.75, 1.0];
+    // Fondo blanco con gradiente sutil
+    final backgroundPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Colors.white,
+          Colors.white.withValues(alpha: 0.98),
+        ],
+      ).createShader(chartRect);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(chartRect, const Radius.circular(16)),
+      backgroundPaint,
+    );
 
-    final gridPaint = Paint()..color = gridColor..strokeWidth = 1;
+    // Sombra sutil
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.04)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(chartRect, const Radius.circular(16)),
+      shadowPaint,
+    );
 
+    final gridPaint = Paint()
+      ..color = gridColor.withValues(alpha: 0.25)
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+
+    // Dibujar líneas de cuadrícula horizontales con gradiente
+    const yTicks = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0];
     for (final tick in yTicks) {
       final y = chartRect.bottom - (chartRect.height * tick);
+      final opacity = 0.15 + (tick * 0.25); // Más opaco en valores más altos
       canvas.drawLine(
         Offset(chartRect.left, y),
         Offset(chartRect.right, y),
-        gridPaint,
+        gridPaint..color = gridColor.withValues(alpha: opacity),
       );
-
-      final label = '${(tick * 100).round()}%';
-      final tp = TextPainter(
-        text: TextSpan(text: label, style: textStyle),
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-      tp.paint(canvas, Offset(0, y - (tp.height / 2)));
     }
 
-    final axisPaint = Paint()..color = gridColor.withValues(alpha: 0.9)..strokeWidth = 1.2;
+    // Dibujar eje Y con valores absolutos mejorados
+    if (buckets.isNotEmpty) {
+      final maxPower = buckets.fold<double>(0, (max, item) => math.max(max, item.power));
+      final maxVoltage = buckets.fold<double>(0, (max, item) => math.max(max, item.voltage));
+      final maxCurrent = buckets.fold<double>(0, (max, item) => math.max(max, item.current));
+
+      final normalizationPower = normalizationLimits.powerW > 0 ? normalizationLimits.powerW : math.max(maxPower, 1.0);
+      final normalizationVoltage = normalizationLimits.voltageV > 0 ? normalizationLimits.voltageV : math.max(maxVoltage, 1.0);
+      final normalizationCurrent = normalizationLimits.currentA > 0 ? normalizationLimits.currentA : math.max(maxCurrent, 1.0);
+
+      for (final tick in yTicks) {
+        final y = chartRect.bottom - (chartRect.height * tick);
+        final powerValue = normalizationPower * tick;
+        final voltageValue = normalizationVoltage * tick;
+        final currentValue = normalizationCurrent * tick;
+
+        final displayValue = powerValue > voltageValue ? powerValue : voltageValue > currentValue ? voltageValue : currentValue;
+        final label = displayValue >= 10 ? displayValue.toStringAsFixed(0) : displayValue.toStringAsFixed(1);
+
+        final tp = TextPainter(
+          text: TextSpan(
+            text: label,
+            style: textStyle.copyWith(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: gridColor.withValues(alpha: 0.8),
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+
+        tp.paint(canvas, Offset(8, y - (tp.height / 2)));
+      }
+    } else {
+      const defaultMax = 100.0;
+      for (final tick in yTicks) {
+        final y = chartRect.bottom - (chartRect.height * tick);
+        final value = defaultMax * tick;
+        final label = value.toStringAsFixed(0);
+
+        final tp = TextPainter(
+          text: TextSpan(
+            text: label,
+            style: textStyle.copyWith(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: gridColor.withValues(alpha: 0.6),
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+
+        tp.paint(canvas, Offset(8, y - (tp.height / 2)));
+      }
+    }
+
+    final axisPaint = Paint()
+      ..color = gridColor.withValues(alpha: 0.6)
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
 
     canvas.drawLine(
       Offset(chartRect.left, chartRect.bottom),
@@ -554,13 +687,26 @@ class GroupedHistogramPainter extends CustomPainter {
     );
 
     if (buckets.isEmpty) {
+      final message = 'No hay datos disponibles para mostrar.\n\n'
+          'Posibles causas:\n'
+          '• El dispositivo no ha enviado datos recientemente\n'
+          '• El rango temporal seleccionado no contiene datos\n'
+          '• Verifica la conexión del dispositivo\n\n'
+          'Los datos se actualizarán automáticamente.';
+
       final tp = TextPainter(
         text: TextSpan(
-          text: 'No hay datos para este periodo',
-          style: textStyle.copyWith(fontSize: 12),
+          text: message,
+          style: textStyle.copyWith(
+            fontSize: 14,
+            color: gridColor.withValues(alpha: 0.7),
+            height: 1.6,
+            fontWeight: FontWeight.w500,
+          ),
         ),
         textDirection: TextDirection.ltr,
-      )..layout(maxWidth: size.width);
+        textAlign: TextAlign.center,
+      )..layout(maxWidth: size.width * 0.85);
 
       tp.paint(canvas, Offset(
           (size.width - tp.width) / 2,
@@ -574,12 +720,12 @@ class GroupedHistogramPainter extends CustomPainter {
     final maxVoltage = buckets.fold<double>(0, (max, item) => math.max(max, item.voltage));
     final maxCurrent = buckets.fold<double>(0, (max, item) => math.max(max, item.current));
 
-    final normalizationPower = normalizationLimits.powerW > 0 ? normalizationLimits.powerW : maxPower;
-    final normalizationVoltage = normalizationLimits.voltageV > 0 ? normalizationLimits.voltageV : maxVoltage;
-    final normalizationCurrent = normalizationLimits.currentA > 0 ? normalizationLimits.currentA : maxCurrent;
+    final normalizationPower = normalizationLimits.powerW > 0 ? normalizationLimits.powerW : math.max(maxPower, 1.0);
+    final normalizationVoltage = normalizationLimits.voltageV > 0 ? normalizationLimits.voltageV : math.max(maxVoltage, 1.0);
+    final normalizationCurrent = normalizationLimits.currentA > 0 ? normalizationLimits.currentA : math.max(maxCurrent, 1.0);
 
     final bucketWidth = chartRect.width / buckets.length;
-    final groupWidth = bucketWidth * 0.60;
+    final groupWidth = bucketWidth * 0.75;
     final barWidth = groupWidth / 3;
 
     final powerPaint = Paint()..color = powerColor;
@@ -594,49 +740,60 @@ class GroupedHistogramPainter extends CustomPainter {
       final voltageRatio = normalizedRatio(bucket.voltage, normalizationVoltage);
       final currentRatio = normalizedRatio(bucket.current, normalizationCurrent);
 
-      drawBar(
-        canvas: canvas,
-        rect: Rect.fromLTWH(
-          baseX,
-          chartRect.bottom - (chartRect.height * powerRatio),
-          barWidth,
-          chartRect.height * powerRatio,
-        ),
-        paint: powerPaint,
-      );
+      if (bucket.power > 0) {
+        drawBar(
+          canvas: canvas,
+          rect: Rect.fromLTWH(
+            baseX,
+            chartRect.bottom - (chartRect.height * powerRatio),
+            barWidth,
+            chartRect.height * powerRatio,
+          ),
+          paint: powerPaint,
+          color: powerColor,
+        );
+      }
 
-      drawBar(
-        canvas: canvas,
-        rect: Rect.fromLTWH(
-          baseX + barWidth,
-          chartRect.bottom - (chartRect.height * voltageRatio),
-          barWidth,
-          chartRect.height * voltageRatio,
-        ),
-        paint: voltagePaint,
-      );
+      if (bucket.voltage > 0) {
+        drawBar(
+          canvas: canvas,
+          rect: Rect.fromLTWH(
+            baseX + barWidth,
+            chartRect.bottom - (chartRect.height * voltageRatio),
+            barWidth,
+            chartRect.height * voltageRatio,
+          ),
+          paint: voltagePaint,
+          color: voltageColor,
+        );
+      }
 
-      drawBar(
-        canvas: canvas,
-        rect: Rect.fromLTWH(
-          baseX + (barWidth * 2),
-          chartRect.bottom - (chartRect.height * currentRatio),
-          barWidth,
-          chartRect.height * currentRatio,
-        ),
-        paint: currentPaint,
-      );
+      if (bucket.current > 0) {
+        drawBar(
+          canvas: canvas,
+          rect: Rect.fromLTWH(
+            baseX + (barWidth * 2),
+            chartRect.bottom - (chartRect.height * currentRatio),
+            barWidth,
+            chartRect.height * currentRatio,
+          ),
+          paint: currentPaint,
+          color: currentColor,
+        );
+      }
 
       final shouldPaintLabel = _shouldPaintLabel(i, buckets.length, mode);
       if (!shouldPaintLabel) continue;
 
-      final labelWidth = bucketWidth.clamp(24.0, 54.0);
+      final labelWidth = bucketWidth.clamp(32.0, 70.0);
 
       final tp = TextPainter(
         text: TextSpan(
           text: bucket.label,
           style: textStyle.copyWith(
             fontSize: mode == AnalyticsChartMode.weekDays ? 9 : textStyle.fontSize,
+            fontWeight: FontWeight.w700,
+            color: gridColor.withValues(alpha: 0.9),
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -649,7 +806,7 @@ class GroupedHistogramPainter extends CustomPainter {
         chartRect.right - labelWidth,
       );
 
-      tp.paint(canvas, Offset(dx, chartRect.bottom + 8));
+      tp.paint(canvas, Offset(dx, chartRect.bottom + 10));
     }
   }
 
@@ -657,9 +814,33 @@ class GroupedHistogramPainter extends CustomPainter {
     required Canvas canvas,
     required Rect rect,
     required Paint paint,
+    required Color color,
   }) {
     if (rect.height <= 0) return;
+
+    final shadowRect = rect.translate(0, 2);
+    final shadowPaint = Paint()
+      ..color = color.withValues(alpha: 0.2)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+    canvas.drawRRect(RRect.fromRectAndRadius(shadowRect, const Radius.circular(8)), shadowPaint);
+
+    final gradient = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        color.withValues(alpha: 0.9),
+        color.withValues(alpha: 0.7),
+      ],
+    );
+
+    paint.shader = gradient.createShader(rect);
     canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(6)), paint);
+
+    final borderPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(6)), borderPaint);
   }
 
   double normalizedRatio(double value, double normalizationValue) {
@@ -723,13 +904,42 @@ class AggregateLinePainter extends CustomPainter {
       size.height - topPadding - bottomPadding,
     );
 
+    final backgroundPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Colors.white,
+          Colors.white.withValues(alpha: 0.98),
+        ],
+      ).createShader(chartRect);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(chartRect, const Radius.circular(16)),
+      backgroundPaint,
+    );
+
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.04)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(chartRect, const Radius.circular(16)),
+      shadowPaint,
+    );
+
     if (buckets.isEmpty) {
       final tp = TextPainter(
-        text: TextSpan(text: 'No hay datos para este periodo',
-          style: textStyle.copyWith(fontSize: 12),
+        text: TextSpan(
+          text: 'Esperando datos...\nLa gráfica se actualizará automáticamente.',
+          style: textStyle.copyWith(
+            fontSize: 15,
+            color: gridColor.withValues(alpha: 0.7),
+            height: 1.5,
+            fontWeight: FontWeight.w500,
+          ),
         ),
         textDirection: TextDirection.ltr,
-      )..layout(maxWidth: size.width);
+        textAlign: TextAlign.center,
+      )..layout(maxWidth: size.width * 0.8);
 
       tp.paint(canvas,
         Offset((size.width - tp.width) / 2, (size.height - tp.height) / 2),
@@ -743,26 +953,40 @@ class AggregateLinePainter extends CustomPainter {
     final safeMinValue = minValue == double.infinity ? 0.0 : minValue;
     final valueRange = (maxValue - safeMinValue).abs() < 0.0001 ? math.max(1.0, maxValue) : (maxValue - safeMinValue);
 
-    final gridPaint = Paint()..color = gridColor..strokeWidth = 1;
+    final gridPaint = Paint()
+      ..color = gridColor.withValues(alpha: 0.25)
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
 
     const gridLines = 5;
     for (int i = 0; i < gridLines; i++) {
       final ratio = i / (gridLines - 1);
       final y = chartRect.bottom - (chartRect.height * ratio);
-      canvas.drawLine(Offset(chartRect.left, y), Offset(chartRect.right, y), gridPaint);
+      final opacity = 0.15 + (ratio * 0.25);
+      canvas.drawLine(Offset(chartRect.left, y), Offset(chartRect.right, y), gridPaint..color = gridColor.withValues(alpha: opacity));
 
       final value = safeMinValue + (valueRange * ratio);
       final label = value >= 100 ? value.toStringAsFixed(0) : value.toStringAsFixed(2);
 
       final tp = TextPainter(
-        text: TextSpan(text: label, style: textStyle),
+        text: TextSpan(
+          text: label,
+          style: textStyle.copyWith(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: gridColor.withValues(alpha: 0.8),
+          ),
+        ),
         textDirection: TextDirection.ltr,
       )..layout();
 
-      tp.paint(canvas, Offset(0, y - (tp.height / 2)));
+      tp.paint(canvas, Offset(8, y - (tp.height / 2)));
     }
 
-    final axisPaint = Paint()..color = gridColor.withValues(alpha: 0.9)..strokeWidth = 1.2;
+    final axisPaint = Paint()
+      ..color = gridColor.withValues(alpha: 0.6)
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
 
     canvas.drawLine(
       Offset(chartRect.left, chartRect.bottom),
@@ -771,10 +995,16 @@ class AggregateLinePainter extends CustomPainter {
     );
 
     final pointSpacing = buckets.length == 1 ? 0.0 : chartRect.width / (buckets.length - 1);
-    final linePaint = Paint()..color = lineColor..strokeWidth = 2.2..style = PaintingStyle.stroke;
+    final linePaint = Paint()
+      ..color = lineColor
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
     final pointPaint = Paint()..color = lineColor..style = PaintingStyle.fill;
 
     final path = Path();
+    final fillPath = Path();
     final points = <Offset>[];
 
     for (int i = 0; i < buckets.length; i++) {
@@ -787,14 +1017,35 @@ class AggregateLinePainter extends CustomPainter {
 
       if (i == 0) {
         path.moveTo(offset.dx, offset.dy);
+        fillPath.moveTo(offset.dx, chartRect.bottom);
+        fillPath.lineTo(offset.dx, offset.dy);
       } else {
         path.lineTo(offset.dx, offset.dy);
+        fillPath.lineTo(offset.dx, offset.dy);
       }
+    }
+
+    if (buckets.length > 1) {
+      final lastPoint = points.last;
+      fillPath.lineTo(lastPoint.dx, chartRect.bottom);
+      fillPath.close();
+
+      final fillPaint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            lineColor.withValues(alpha: 0.15),
+            lineColor.withValues(alpha: 0.05),
+          ],
+        ).createShader(fillPath.getBounds());
+      canvas.drawPath(fillPath, fillPaint);
     }
 
     canvas.drawPath(path, linePaint);
 
     for (final point in points) {
+      canvas.drawCircle(point.translate(0, 1), 4.5, Paint()..color = lineColor.withValues(alpha: 0.2));
       canvas.drawCircle(point, 3.5, pointPaint);
       canvas.drawCircle(point, 5.5,
         Paint()..color = lineColor.withValues(alpha: 0.16)..style = PaintingStyle.fill,
@@ -815,6 +1066,8 @@ class AggregateLinePainter extends CustomPainter {
           text: label,
           style: textStyle.copyWith(
             fontSize: mode == AnalyticsChartMode.weekDays ? 9 : textStyle.fontSize,
+            fontWeight: FontWeight.w700,
+            color: gridColor.withValues(alpha: 0.9),
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -827,7 +1080,7 @@ class AggregateLinePainter extends CustomPainter {
         chartRect.right - labelWidth,
       );
 
-      tp.paint(canvas, Offset(dx, chartRect.bottom + 8));
+      tp.paint(canvas, Offset(dx, chartRect.bottom + 10));
     }
   }
 
@@ -880,14 +1133,60 @@ class RealtimeAggregateLinePainter extends CustomPainter {
       size.height - bottomPad,
     );
 
+    final backgroundPaint = Paint()..color = Colors.white..style = PaintingStyle.fill;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(chartRect, const Radius.circular(16)),
+      backgroundPaint,
+    );
+
     if (chartRect.width <= 0 || chartRect.height <= 0 || buckets.isEmpty) {
+      // Mostrar mensaje cuando no hay datos
+      final tp = TextPainter(
+        text: TextSpan(
+          text: 'Esperando datos...\nLa gráfica se actualizará automáticamente.',
+          style: textStyle.copyWith(
+            fontSize: 14,
+            color: Colors.black.withValues(alpha: 0.7),
+            height: 1.4,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      )..layout(maxWidth: size.width * 0.8);
+
+      tp.paint(canvas, Offset(
+          (size.width - tp.width) / 2,
+          (size.height - tp.height) / 2,
+        ),
+      );
       return;
     }
 
     final pointsData = buckets.where((e) => e.timestamp != null).toList()
       ..sort((a, b) => a.timestamp!.compareTo(b.timestamp!));
 
-    if (pointsData.isEmpty) return;
+    if (pointsData.isEmpty) {
+      // Mostrar mensaje cuando no hay timestamps válidos
+      final tp = TextPainter(
+        text: TextSpan(
+          text: 'Esperando datos...\nLa gráfica se actualizará automáticamente.',
+          style: textStyle.copyWith(
+            fontSize: 14,
+            color: Colors.black.withValues(alpha: 0.7),
+            height: 1.4,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      )..layout(maxWidth: size.width * 0.8);
+
+      tp.paint(canvas, Offset(
+          (size.width - tp.width) / 2,
+          (size.height - tp.height) / 2,
+        ),
+      );
+      return;
+    }
 
     final axisStartMs = pointsData.first.timestamp!.millisecondsSinceEpoch.toDouble();
     final axisEndMs = pointsData.last.timestamp!.millisecondsSinceEpoch.toDouble();
