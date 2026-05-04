@@ -15,7 +15,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
 
     <application
-        android:label="iot_manager"
+        android:label="HomeSync"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
