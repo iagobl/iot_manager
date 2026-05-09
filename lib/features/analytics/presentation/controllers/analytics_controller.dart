@@ -2,10 +2,14 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
+
 import 'package:iot_manager/core/error/error_mapper.dart';
 import 'package:iot_manager/features/analytics/data/datasources/analytics_remote_datasource.dart';
 import 'package:iot_manager/features/analytics/data/repositories/analytics_repository_impl.dart';
 import 'package:iot_manager/features/analytics/domain/entities/analytics_models.dart';
+import 'package:iot_manager/features/reports/data/repositories/reports_repository_impl.dart';
+import 'package:iot_manager/features/reports/domain/usecases/generate_consumption_report.dart';
 
 class AnalyticsController extends ChangeNotifier {
   AnalyticsController({
@@ -547,18 +551,80 @@ class AnalyticsController extends ChangeNotifier {
   }
 
   Future<void> exportPdf(BuildContext context) async {
-    emit(_state.copyWith(exporting: true, clearError: true));
+    final scope = _state.selectedScope;
 
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-
-    emit(_state.copyWith(exporting: false));
-
-    if (context.mounted) {
+    if (scope == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('La exportación PDF se deja para el siguiente ajuste.'),
+          content: Text('Selecciona un dispositivo o un hogar para generar el informe.'),
         ),
       );
+      return;
+    }
+
+    if (samples.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay datos en este periodo para generar el informe.'),
+        ),
+      );
+      return;
+    }
+
+    emit(_state.copyWith(exporting: true, clearError: true));
+
+    try {
+      final query = AnalyticsQuery(
+        scope: scope,
+        rangePreset: _state.rangePreset,
+        from: _state.from,
+        to: _state.to,
+      );
+
+      final generateReport = GenerateConsumptionReport(
+        ReportsRepositoryImpl(),
+      );
+
+      final pdfBytes = await generateReport(
+        query: query,
+        samples: samples,
+      );
+
+      final safeName = scope.label
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+          .replaceAll(RegExp(r'_+'), '_')
+          .replaceAll(RegExp(r'^_|_$'), '');
+
+      await Printing.sharePdf(
+        bytes: pdfBytes,
+        filename: 'informe_consumo_$safeName.pdf',
+      );
+
+      emit(_state.copyWith(exporting: false));
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Informe PDF generado correctamente.'),
+          ),
+        );
+      }
+    } catch (error) {
+      emit(
+        _state.copyWith(
+          exporting: false,
+          errorMessage: ErrorMapper.mapException(error).message,
+        ),
+      );
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No se pudo generar el informe: $error'),
+          ),
+        );
+      }
     }
   }
 

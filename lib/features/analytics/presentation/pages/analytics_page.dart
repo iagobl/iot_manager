@@ -467,7 +467,7 @@ class HeroCard extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             )
                 : const Icon(Icons.picture_as_pdf_rounded),
-            label: Text(exporting ? 'Exportando' : 'PDF'),
+            label: Text(exporting ? '' : 'PDF'),
             style: FilledButton.styleFrom(
               backgroundColor:
               scheme.onPrimary.withValues(alpha: 0.14),
