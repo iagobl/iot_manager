@@ -186,12 +186,34 @@ class ProfileRemoteDatasource {
         throw const AuthAppException('No se pudo verificar la sesión actual.');
       }
 
-      await client.auth.signInWithPassword(email: email, password: currentPassword)
-          .timeout(const Duration(seconds: 15));
+      await client.auth.signInWithPassword(email: email, password: currentPassword).timeout(const Duration(seconds: 15));
 
-      await client.auth.updateUser(UserAttributes(password: newPassword),)
-          .timeout(const Duration(seconds: 15));
+      await client.auth.updateUser(
+        UserAttributes(password: newPassword),
+      ).timeout(const Duration(seconds: 15));
+    } on TimeoutException {
+      throw const TimeoutAppException('La operación tardó demasiado. Revisa la conexión.');
+    } catch (e) {
+      throw ErrorMapper.mapException(e);
+    }
+  }
 
+  Future<void> requestPasswordReset({
+    required String email,
+    String? redirectTo,
+  }) async {
+    try {
+      final trimmedEmail = email.trim();
+      if (trimmedEmail.isEmpty) {
+        throw const ValidationAppException('Introduce un correo válido.');
+      }
+
+      await client.auth
+          .resetPasswordForEmail(
+        trimmedEmail,
+        redirectTo: redirectTo,
+      )
+          .timeout(const Duration(seconds: 15));
     } on TimeoutException {
       throw const TimeoutAppException('La operación tardó demasiado. Revisa la conexión.');
     } catch (e) {

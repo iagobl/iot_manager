@@ -6,7 +6,7 @@ import 'package:iot_manager/features/profile/domain/entities/profile_entity.dart
 import 'package:iot_manager/features/profile/domain/repositories/profile_repository.dart';
 
 class ProfileRepositoryImpl implements ProfileRepository {
-  ProfileRepositoryImpl({ProfileRemoteDatasource? remoteDatasource,})
+  ProfileRepositoryImpl({ProfileRemoteDatasource? remoteDatasource})
       : remoteDatasource = remoteDatasource ?? ProfileRemoteDatasource();
 
   final ProfileRemoteDatasource remoteDatasource;
@@ -58,5 +58,10 @@ class ProfileRepositoryImpl implements ProfileRepository {
   @override
   Future<void> changePassword({required String currentPassword, required String newPassword}) {
     return remoteDatasource.changePassword(currentPassword: currentPassword, newPassword: newPassword);
+  }
+
+  @override
+  Future<void> requestPasswordReset({required String email, String? redirectTo}) {
+    return remoteDatasource.requestPasswordReset(email: email, redirectTo: redirectTo);
   }
 }

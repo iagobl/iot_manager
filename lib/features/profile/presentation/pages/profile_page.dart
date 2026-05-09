@@ -84,7 +84,7 @@ class ProfilePageState extends State<ProfilePage> {
 
   Future<void> showMessage(String message) async {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)),);
   }
 
   Future<void> saveBasicProfile() async {
@@ -113,7 +113,18 @@ class ProfilePageState extends State<ProfilePage> {
 
       await showMessage(message);
     } catch (_) {
-      await showMessage(controller.error ?? 'No se pudo actualizar la contraseña.',);
+      await showMessage(controller.error ?? 'No se pudo actualizar la contraseña.');
+    }
+  }
+
+  Future<void> requestPasswordReset() async {
+    try {
+      await controller.sendPasswordRecoveryEmail(
+        email: emailController.text,
+        redirectTo: 'iotmanager://reset-password',
+      );
+    } catch (_) {
+      await showMessage(controller.error ?? 'No se pudo enviar el enlace de recuperación.');
     }
   }
 
@@ -159,9 +170,8 @@ class ProfilePageState extends State<ProfilePage> {
   InputDecoration profileFieldDecoration({
     required BuildContext context,
     required String label,
-    required IconData icon,}) {
-
-
+    required IconData icon,
+  }) {
     final cs = Theme.of(context).colorScheme;
 
     return InputDecoration(
@@ -299,10 +309,10 @@ class ProfilePageState extends State<ProfilePage> {
                           obscureNewPassword: obscureNewPassword,
                           obscureConfirmPassword: obscureConfirmPassword,
                           changingPassword: controller.changingPassword,
+                          requestingPasswordReset: controller.requestingPasswordReset,
                           currentPasswordController: currentPasswordController,
                           newPasswordController: newPasswordController,
-                          confirmNewPasswordController:
-                          confirmNewPasswordController,
+                          confirmNewPasswordController: confirmNewPasswordController,
                           onToggleSection: () {
                             setState(() {
                               showPasswordSection = !showPasswordSection;
@@ -319,11 +329,16 @@ class ProfilePageState extends State<ProfilePage> {
                             setState(() {obscureConfirmPassword = !obscureConfirmPassword;});
                           },
                           onChangePassword: changePassword,
+                          onRequestPasswordReset: requestPasswordReset,
+                        ),
+                        const SizedBox(height: 18),
+                        ProfilePreferencesCard(
+                          unitPreferences: profile.unitPreferences,
+                          onChanged: updateUnitPreference,
                         ),
                         const SizedBox(height: 18),
                         ProfileNotificationsCard(
-                          notificationPreferences:
-                          profile.notificationPreferences,
+                          notificationPreferences: profile.notificationPreferences,
                           onChanged: updateNotificationPreference,
                         ),
                       ],

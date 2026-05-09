@@ -10,6 +10,7 @@ class ProfileSecurityCard extends StatelessWidget {
     required this.obscureNewPassword,
     required this.obscureConfirmPassword,
     required this.changingPassword,
+    required this.requestingPasswordReset,
     required this.currentPasswordController,
     required this.newPasswordController,
     required this.confirmNewPasswordController,
@@ -18,6 +19,7 @@ class ProfileSecurityCard extends StatelessWidget {
     required this.onToggleNewPasswordVisibility,
     required this.onToggleConfirmPasswordVisibility,
     required this.onChangePassword,
+    required this.onRequestPasswordReset,
   });
 
   final bool showPasswordSection;
@@ -25,6 +27,7 @@ class ProfileSecurityCard extends StatelessWidget {
   final bool obscureNewPassword;
   final bool obscureConfirmPassword;
   final bool changingPassword;
+  final bool requestingPasswordReset;
   final TextEditingController currentPasswordController;
   final TextEditingController newPasswordController;
   final TextEditingController confirmNewPasswordController;
@@ -33,6 +36,7 @@ class ProfileSecurityCard extends StatelessWidget {
   final VoidCallback onToggleNewPasswordVisibility;
   final VoidCallback onToggleConfirmPasswordVisibility;
   final VoidCallback onChangePassword;
+  final VoidCallback onRequestPasswordReset;
 
   @override
   Widget build(BuildContext context) {
@@ -53,19 +57,60 @@ class ProfileSecurityCard extends StatelessWidget {
                       style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800,),
                     ),
                     const SizedBox(height: 4),
-                    Text('Cambia tu contraseña de acceso de forma segura.',
+                    Text('Cambia tu contraseña o solicita un enlace de recuperación.',
                       style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant,),
                     ),
                   ],
                 ),
               ),
               OutlinedButton.icon(
-                onPressed: onToggleSection,
-                icon: Icon(showPasswordSection ? Icons.expand_less_rounded : Icons.lock_outline_rounded,
+                onPressed: changingPassword || requestingPasswordReset
+                    ? null
+                    : onToggleSection,
+                icon: Icon(
+                  showPasswordSection
+                      ? Icons.expand_less_rounded
+                      : Icons.lock_outline_rounded,
                 ),
                 label: Text(showPasswordSection ? 'Ocultar' : 'Cambiar'),
               ),
             ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: cs.primaryContainer.withValues(alpha: 0.28),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: cs.primary.withValues(alpha: 0.14),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.mark_email_read_rounded,
+                  color: cs.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('Si no recuerdas la contraseña actual, puedes recibir un enlace de recuperación en tu correo.',
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                TextButton(
+                  onPressed: changingPassword || requestingPasswordReset ? null
+                      : onRequestPasswordReset,
+                  child: requestingPasswordReset ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ) : const Text('Enviar enlace'),
+                ),
+              ],
+            ),
           ),
           if (showPasswordSection) ...[
             const SizedBox(height: 16),

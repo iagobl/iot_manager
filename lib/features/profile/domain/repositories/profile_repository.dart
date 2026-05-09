@@ -20,4 +20,6 @@ abstract class ProfileRepository {
   Future<String?> createAvatarSignedUrl(String? path);
 
   Future<void> changePassword({required String currentPassword, required String newPassword});
+
+  Future<void> requestPasswordReset({required String email, String? redirectTo});
 }
