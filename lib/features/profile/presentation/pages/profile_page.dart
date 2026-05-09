@@ -6,7 +6,6 @@ import 'package:iot_manager/features/profile/presentation/controllers/profile_co
 import 'package:iot_manager/features/profile/presentation/widgets/profile_header_card.dart';
 import 'package:iot_manager/features/profile/presentation/widgets/profile_notifications_card.dart';
 import 'package:iot_manager/features/profile/presentation/widgets/profile_personal_info_card.dart';
-import 'package:iot_manager/features/profile/presentation/widgets/profile_preferences_card.dart';
 import 'package:iot_manager/features/profile/presentation/widgets/profile_security_card.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -330,11 +329,6 @@ class ProfilePageState extends State<ProfilePage> {
                           },
                           onChangePassword: changePassword,
                           onRequestPasswordReset: requestPasswordReset,
-                        ),
-                        const SizedBox(height: 18),
-                        ProfilePreferencesCard(
-                          unitPreferences: profile.unitPreferences,
-                          onChanged: updateUnitPreference,
                         ),
                         const SizedBox(height: 18),
                         ProfileNotificationsCard(

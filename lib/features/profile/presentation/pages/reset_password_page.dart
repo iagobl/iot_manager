@@ -140,6 +140,9 @@ class ResetPasswordPageState extends State<ResetPasswordPage> {
                         textInputAction: TextInputAction.next,
                         decoration: InputDecoration(
                           labelText: 'Nueva contraseña',
+                          labelStyle: const TextStyle(
+                            fontSize: 12,
+                          ),
                           prefixIcon: const Icon(Icons.lock_reset_rounded),
                           suffixIcon: IconButton(
                             onPressed: () {
@@ -164,6 +167,9 @@ class ResetPasswordPageState extends State<ResetPasswordPage> {
                         onSubmitted: (_) => loading ? null : updatePassword(),
                         decoration: InputDecoration(
                           labelText: 'Repetir nueva contraseña',
+                          labelStyle: const TextStyle(
+                            fontSize: 12,
+                          ),
                           prefixIcon: const Icon(Icons.verified_user_rounded),
                           suffixIcon: IconButton(
                             onPressed: () {

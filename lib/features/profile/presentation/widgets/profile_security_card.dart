@@ -63,16 +63,28 @@ class ProfileSecurityCard extends StatelessWidget {
                   ],
                 ),
               ),
-              OutlinedButton.icon(
-                onPressed: changingPassword || requestingPasswordReset
-                    ? null
-                    : onToggleSection,
-                icon: Icon(
-                  showPasswordSection
-                      ? Icons.expand_less_rounded
-                      : Icons.lock_outline_rounded,
+              SizedBox(
+                width: 118,
+                height: 44,
+                child: OutlinedButton.icon(
+                  onPressed: changingPassword || requestingPasswordReset
+                      ? null
+                      : onToggleSection,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    alignment: Alignment.center,
+                  ),
+                  icon: Icon(
+                    showPasswordSection
+                        ? Icons.expand_less_rounded
+                        : Icons.lock_outline_rounded,
+                    size: 18,
+                  ),
+                  label: Text(
+                    showPasswordSection ? 'Ocultar' : 'Cambiar',
+                    style: const TextStyle(fontSize: 13),
+                  ),
                 ),
-                label: Text(showPasswordSection ? 'Ocultar' : 'Cambiar'),
               ),
             ],
           ),
@@ -95,7 +107,7 @@ class ProfileSecurityCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text('Si no recuerdas la contraseña actual, puedes recibir un enlace de recuperación en tu correo.',
+                  child: Text('Recuperar contraseña, por medio del correo.',
                     style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ),
