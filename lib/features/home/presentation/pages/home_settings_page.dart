@@ -303,6 +303,7 @@ enum HomeSettingsSection {
 class ExpandableSectionCard extends StatelessWidget {
 
   const ExpandableSectionCard({
+    super.key,
     required this.title,
     required this.subtitle,
     required this.isExpanded,

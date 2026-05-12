@@ -26,7 +26,6 @@ class PushNotificationService {
   );
 
   bool _initialized = false;
-  String? _currentToken;
 
   StreamSubscription<String>? _tokenRefreshSubscription;
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
@@ -143,7 +142,6 @@ class PushNotificationService {
       return;
     }
 
-    _currentToken = token;
 
     final userId = Supabase.instance.client.auth.currentUser?.id;
     debugPrint('Usuario actual para guardar token: $userId');

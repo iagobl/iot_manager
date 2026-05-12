@@ -55,6 +55,7 @@ class AnalyticsStats extends StatelessWidget {
 
 class StatItem extends StatelessWidget {
   const StatItem({
+    super.key,
     required this.label,
     required this.value,
     required this.color,

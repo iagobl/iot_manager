@@ -2,14 +2,13 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:printing/printing.dart';
-
 import 'package:iot_manager/core/error/error_mapper.dart';
 import 'package:iot_manager/features/analytics/data/datasources/analytics_remote_datasource.dart';
 import 'package:iot_manager/features/analytics/data/repositories/analytics_repository_impl.dart';
 import 'package:iot_manager/features/analytics/domain/entities/analytics_models.dart';
 import 'package:iot_manager/features/reports/data/repositories/reports_repository_impl.dart';
 import 'package:iot_manager/features/reports/domain/usecases/generate_consumption_report.dart';
+import 'package:printing/printing.dart';
 
 class AnalyticsController extends ChangeNotifier {
   AnalyticsController({

@@ -155,7 +155,7 @@ class AnalyticsRepositoryImpl implements AnalyticsRepository {
 
       final rawMeta = row['meta'];
       final meta = rawMeta is Map
-          ? Map<String, dynamic>.from(rawMeta as Map)
+          ? Map<String, dynamic>.from(rawMeta)
           : <String, dynamic>{};
 
       final timestamp = remoteDatasource.extractTimestamp(row);

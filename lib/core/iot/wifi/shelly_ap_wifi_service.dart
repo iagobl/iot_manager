@@ -71,6 +71,7 @@ class ShellyApWifiService {
   Future<List<ShellyApAccessPoint>> scanShellyAccessPoints() async {
     try {
       await ensurePermissions();
+      // ignore: deprecated_member_use
       final results = await WiFiForIoTPlugin.loadWifiList();
 
       final mapped = results.map((network) => ShellyApAccessPoint(
