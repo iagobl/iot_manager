@@ -3,142 +3,150 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import '../../domain/entities/report_models.dart';
+import 'package:iot_manager/features/reports/domain/entities/report_models.dart';
 
 class PvpcRemoteDatasource {
   PvpcRemoteDatasource({http.Client? client,}) : _client = client ?? http.Client();
 
   final http.Client _client;
-  static const String publicBaseUrl = 'https://api.preciodelaluz.org/v1/prices/all';
-  static const String esiosBaseUrl = 'https://api.esios.ree.es/indicators/1001';
-
-  final String esiosToken = const String.fromEnvironment('ESIOS_API_KEY');
+  static const String _baseUrl = 'https://api.esios.ree.es/archives/70/download_json';
 
   Future<List<PvpcHourlyPrice>> fetchPrices(DateTime from, DateTime to) async {
-    final normalizedFrom = DateTime(from.year, from.month, from.day);
-    final normalizedTo = DateTime(to.year, to.month, to.day, 23, 59, 59);
-
-    try {
-      final publicPrices = await fetchFromPrecioDeLaLuz(normalizedFrom, normalizedTo);
-
-      debugPrint('PVPC precios públicos obtenidos: ${publicPrices.length}');
-
-      if (publicPrices.isNotEmpty) {
-        return publicPrices;
-      }
-    } catch (error) {
-      debugPrint('Error obteniendo precios desde preciodelaluz.org: $error');
-    }
-
-    if (esiosToken.isEmpty) {
-      debugPrint('No hay token de ESIOS configurado -> devolviendo precios vacíos');
-      return <PvpcHourlyPrice>[];
-    }
-
-    try {
-      final esiosPrices = await _fetchFromEsios(normalizedFrom, normalizedTo);
-
-      debugPrint('PVPC precios ESIOS obtenidos: ${esiosPrices.length}');
-
-      return esiosPrices;
-    } catch (error) {
-      debugPrint('Error obteniendo precios desde ESIOS: $error');
-      return <PvpcHourlyPrice>[];
-    }
-  }
-
-  Future<List<PvpcHourlyPrice>> fetchFromPrecioDeLaLuz(DateTime from, DateTime to
-      ) async {
+    final startDay = DateTime(from.year, from.month, from.day);
+    final endDay = DateTime(to.year, to.month, to.day);
 
     final result = <PvpcHourlyPrice>[];
-    DateTime current = from;
 
-    while (!current.isAfter(to)) {
-      final date =
-          '${current.year.toString().padLeft(4, '0')}-'
-          '${current.month.toString().padLeft(2, '0')}-'
-          '${current.day.toString().padLeft(2, '0')}';
+    var current = startDay;
 
-      final uri = Uri.parse('$publicBaseUrl?zone=PCB&date=$date');
-      final response = await _client.get(uri);
+    while (!current.isAfter(endDay)) {
+      try {
+        final dailyPrices = await fetchDay(current);
+        result.addAll(dailyPrices);
 
-      if (response.statusCode != 200) {
-        debugPrint('Error HTTP ${response.statusCode} en $date');
-        debugPrint(response.body);
+      } catch (error, stackTrace) {
+        debugPrint('Error obteniendo PVPC ${yyyyMmDd(current)}: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
 
-        current = current.add(const Duration(days: 1));
+      current = current.add(const Duration(days: 1));
+    }
+
+    result.sort((a, b) => a.start.compareTo(b.start));
+    return result.where((price) => price.end.isAfter(from) && price.start.isBefore(to)).toList();
+  }
+
+  Future<List<PvpcHourlyPrice>> fetchDay(DateTime day) async {
+    final date = yyyyMmDd(day);
+    final uri = Uri.parse('$_baseUrl?locale=es&date=$date');
+
+    final response = await _client.get(uri).timeout(const Duration(seconds: 12));
+
+    if (response.statusCode != 200) {
+      throw Exception('ESIOS PVPC HTTP ${response.statusCode}: ${response.body}');
+    }
+
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Respuesta PVPC inválida.');
+    }
+
+    final pvpcRows = decoded['PVPC'];
+    if (pvpcRows is! List) {
+      throw const FormatException('No existe la lista PVPC en la respuesta.');
+    }
+
+    final prices = <PvpcHourlyPrice>[];
+
+    for (final row in pvpcRows) {
+      if (row is! Map) continue;
+
+      final item = Map<String, dynamic>.from(row);
+
+      final dia = item['Dia']?.toString();
+      final hora = item['Hora']?.toString();
+      final pcb = item['PCB']?.toString();
+
+      final start = parseStartDateTime(
+        fallbackDay: day,
+        dayText: dia,
+        hourText: hora,
+      );
+
+      final priceEurMwh = parseSpanishDouble(pcb);
+
+      if (start == null || priceEurMwh == null || priceEurMwh <= 0) {
         continue;
       }
 
-      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final priceEurKwh = priceEurMwh / 1000;
 
-      decoded.forEach((key, value) {
-        try {
-          final item = value as Map<String, dynamic>;
-          final label = item['label']?.toString() ?? '';
-          final priceRaw = item['price'];
-
-          if (priceRaw == null) return;
-          final price = (priceRaw as num).toDouble();
-          final parts = label.split('-');
-
-          if (parts.length != 2) return;
-          final startHour = int.tryParse(parts[0].replaceAll('h', '').trim());
-
-          if (startHour == null) return;
-          final start = DateTime(current.year, current.month, current.day, startHour);
-
-          result.add(
-            PvpcHourlyPrice(
-              start: start,
-              end: start.add(const Duration(hours: 1)),
-              priceEurKwh: price > 10 ? price / 1000 : price,
-              source: 'preciodelaluz.org',
-            ),
-          );
-        } catch (e) {
-          debugPrint('Error parseando hora PVPC: $e');
-        }
-      });
-      current = current.add(const Duration(days: 1));
+      prices.add(PvpcHourlyPrice(
+          start: start,
+          end: start.add(const Duration(hours: 1)),
+          priceEurKwh: priceEurKwh,
+          source: 'ESIOS PVPC'),
+      );
     }
-    return result;
+    return prices;
   }
 
-  Future<List<PvpcHourlyPrice>> _fetchFromEsios(DateTime from, DateTime to) async {
-    final uri = Uri.parse(
-      '$esiosBaseUrl?start_date=${from.toIso8601String()}'
-          '&end_date=${to.toIso8601String()}',
+  DateTime? parseStartDateTime({
+    required DateTime fallbackDay,
+    required String? dayText,
+    required String? hourText,
+  }) {
+    final parsedDay = parseSpanishDate(dayText) ?? fallbackDay;
+    final startHour = parseStartHour(hourText);
+
+    if (startHour == null) return null;
+
+    return DateTime(
+      parsedDay.year,
+      parsedDay.month,
+      parsedDay.day,
+      startHour,
     );
+  }
 
-    final response = await _client.get(
-      uri,
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'x-api-key': esiosToken,
-      },
-    );
+  DateTime? parseSpanishDate(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
 
-    if (response.statusCode != 200) {
-      throw Exception('Error ESIOS ${response.statusCode}: ${response.body}');
-    }
+    final parts = value.trim().split('/');
 
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    final indicator = decoded['indicator'] as Map<String, dynamic>;
-    final values = indicator['values'] as List<dynamic>;
+    if (parts.length != 3) return null;
 
-    return values.map((item) {
-      final map = item as Map<String, dynamic>;
-      final start = DateTime.parse(map['datetime'].toString());
-      final value = (map['value'] as num).toDouble();
+    final day = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    final year = int.tryParse(parts[2]);
 
-      return PvpcHourlyPrice(
-        start: start,
-        end: start.add(const Duration(hours: 1)),
-        priceEurKwh: value / 1000,
-        source: 'esios',
-      );
-    }).toList();
+    if (day == null || month == null || year == null) return null;
+
+    return DateTime(year, month, day);
+  }
+
+  int? parseStartHour(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+
+    final match = RegExp(r'^(\d{1,2})').firstMatch(value.trim());
+    final hour = int.tryParse(match?.group(1) ?? '');
+
+    if (hour == null || hour < 0 || hour > 23) return null;
+
+    return hour;
+  }
+
+  double? parseSpanishDouble(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+
+    final normalized = value.trim().replaceAll('.', '').replaceAll(',', '.');
+
+    return double.tryParse(normalized);
+  }
+
+  String yyyyMmDd(DateTime date) {
+    String two(int value) => value.toString().padLeft(2, '0');
+
+    return '${date.year}-${two(date.month)}-${two(date.day)}';
   }
 }

@@ -45,21 +45,22 @@ class ReportsRepositoryImpl implements ReportsRepository {
   }
 
   List<ReportHourlyCost> buildHourlyCosts(
-    List<AnalyticsSample> samples,
-    List<PvpcHourlyPrice> prices,
-    DateTime from,
-    DateTime to,
-  ) {
+      List<AnalyticsSample> samples,
+      List<PvpcHourlyPrice> prices,
+      DateTime from,
+      DateTime to,
+      ) {
     final consumptionByHour = calculateHourlyConsumption(samples, from, to);
-    final hours = <DateTime>{...consumptionByHour.keys, ...prices.map((p) => p.start)}.toList()
+    final hours = <DateTime>{...consumptionByHour.keys, ...prices.map((price) => hourStart(price.start)),}.toList()
       ..sort();
 
-    return hours.where((hour) => !hour.isBefore(DateTime(from.year, from.month, from.day, from.hour)) && !hour.isAfter(to)).map((hour) {
+    return hours.where((hour) => hour.isBefore(to) && hour.add(const Duration(hours: 1)).isAfter(from)).map((hour) {
       final energyWh = consumptionByHour[hour] ?? 0.0;
-      final price = prices.where((p) => p.contains(hour)).cast<PvpcHourlyPrice?>().firstOrNull;
+      final price = prices.where((item) => item.contains(hour)).firstOrNull;
       final priceEurKwh = price?.priceEurKwh ?? 0.0;
-      final cost = (energyWh / 1000) * priceEurKwh;
-      return ReportHourlyCost(hour: hour, energyWh: energyWh, priceEurKwh: priceEurKwh, costEur: cost);
+      final costEur = (energyWh / 1000) * priceEurKwh;
+
+      return ReportHourlyCost(hour: hour, energyWh: energyWh, priceEurKwh: priceEurKwh, costEur: costEur);
     }).toList();
   }
 
@@ -75,15 +76,30 @@ class ReportsRepositoryImpl implements ReportsRepository {
       for (var i = 1; i < entries.length; i++) {
         final previous = entries[i - 1];
         final current = entries[i];
-        final delta = current.energyWh - previous.energyWh;
-        if (!delta.isFinite || delta <= 0) continue;
-        if (current.timestamp.isBefore(from) || current.timestamp.isAfter(to)) continue;
+        final deltaWh = current.energyWh - previous.energyWh;
 
-        final hour = DateTime(current.timestamp.year, current.timestamp.month, current.timestamp.day, current.timestamp.hour);
-        result.update(hour, (value) => value + delta, ifAbsent: () => delta);
+        if (!deltaWh.isFinite || deltaWh <= 0) continue;
+        if (current.timestamp.isBefore(from) || current.timestamp.isAfter(to)) {
+          continue;
+        }
+
+        final hour = hourStart(current.timestamp);
+
+        result.update(hour, (value) => value + deltaWh,
+          ifAbsent: () => deltaWh,
+        );
       }
     }
     return result;
+  }
+
+  DateTime hourStart(DateTime date) {
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      date.hour,
+    );
   }
 }
 

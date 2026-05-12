@@ -13,8 +13,7 @@ class PvpcHourlyPrice {
   final double priceEurKwh;
   final String source;
 
-  bool contains(DateTime value) =>
-      !value.isBefore(start) && value.isBefore(end);
+  bool contains(DateTime value) => !value.isBefore(start) && value.isBefore(end);
 }
 
 class ReportHourlyCost {
@@ -93,12 +92,23 @@ class ConsumptionReportData {
   final DateTime generatedAt;
 
   double get totalEnergyWh => hourlyCosts.fold(0, (sum, item) => sum + item.energyWh);
+
   double get totalCostEur => hourlyCosts.fold(0, (sum, item) => sum + item.costEur);
+
+  double get averagePvpcPriceEurKwh {
+    if (prices.isEmpty) return 0;
+    final total = prices.fold<double>(0, (sum, item) => sum + item.priceEurKwh);
+    return total / prices.length;
+  }
+
   double get averagePriceEurKwh {
-    if (hourlyCosts.isEmpty) return 0;
     final energyKwh = totalEnergyWh / 1000;
-    if (energyKwh <= 0) return 0;
-    return totalCostEur / energyKwh;
+
+    if (energyKwh > 0 && totalCostEur > 0) {
+      return totalCostEur / energyKwh;
+    }
+
+    return averagePvpcPriceEurKwh;
   }
 
   double get averagePowerW {
@@ -106,7 +116,7 @@ class ConsumptionReportData {
     return samples.fold<double>(0, (sum, sample) => sum + sample.powerW) / samples.length;
   }
 
-  double get peakPowerW => samples.fold<double>(0, (max, s) => s.powerW > max ? s.powerW : max);
-  double get peakVoltageV => samples.fold<double>(0, (max, s) => s.voltageV > max ? s.voltageV : max);
-  double get peakCurrentA => samples.fold<double>(0, (max, s) => s.currentA > max ? s.currentA : max);
+  double get peakPowerW => samples.fold<double>(0, (max, sample) => sample.powerW > max ? sample.powerW : max);
+  double get peakVoltageV => samples.fold<double>(0, (max, sample) => sample.voltageV > max ? sample.voltageV : max);
+  double get peakCurrentA => samples.fold<double>(0, (max, sample) => sample.currentA > max ? sample.currentA : max);
 }

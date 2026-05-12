@@ -88,9 +88,9 @@ class ReportPdfDatasource {
 
   pw.Widget kpiGrid(ConsumptionReportData data) {
     final items = [
-      ('Consumo total', '${(data.totalEnergyWh / 1000).toStringAsFixed(3)} kWh'),
-      ('Coste estimado', '${data.totalCostEur.toStringAsFixed(2)} €'),
-      ('Precio medio', '${data.averagePriceEurKwh.toStringAsFixed(4)} €/kWh'),
+      ('Consumo total', formatEnergy(data.totalEnergyWh)),
+      ('Coste estimado', formatMoney(data.totalCostEur)),
+      ('Precio medio', '${data.averagePriceEurKwh.toStringAsFixed(4)} EUR/kWh'),
       ('Potencia media', '${data.averagePowerW.toStringAsFixed(1)} W'),
       ('Pico potencia', '${data.peakPowerW.toStringAsFixed(1)} W'),
       ('Muestras', '${data.samples.length}'),
@@ -100,22 +100,23 @@ class ReportPdfDatasource {
       spacing: 8,
       runSpacing: 8,
       children: items.map((item) => pw.Container(
-        width: 168,
-        padding: const pw.EdgeInsets.all(10),
-        decoration: pw.BoxDecoration(
-          color: PdfColor.fromHex('#EFF6FF'),
-          borderRadius: pw.BorderRadius.circular(10),
-          border: pw.Border.all(color: PdfColor.fromHex('#BFDBFE')),
+          width: 168,
+          padding: const pw.EdgeInsets.all(10),
+          decoration: pw.BoxDecoration(
+            color: PdfColor.fromHex('#EFF6FF'),
+            borderRadius: pw.BorderRadius.circular(10),
+            border: pw.Border.all(color: PdfColor.fromHex('#BFDBFE')),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(item.$1, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+              pw.SizedBox(height: 3),
+              pw.Text(item.$2, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#1E3A8A'))),
+            ],
+          ),
         ),
-        child: pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(item.$1, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
-            pw.SizedBox(height: 3),
-            pw.Text(item.$2, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#1E3A8A'))),
-          ],
-        ),
-      )).toList(),
+      ).toList(),
     );
   }
 
@@ -128,17 +129,18 @@ class ReportPdfDatasource {
 
   pw.Widget hourlyCostChart(ConsumptionReportData data) {
     final rows = compactHourlyRows(data.hourlyCosts, maxRows: 28);
-    final maxEnergy = rows.fold<double>(0, (max, row) => math.max(max, row.energyWh));
-    final maxCost = rows.fold<double>(0, (max, row) => math.max(max, row.costEur));
 
     if (rows.isEmpty) {
       return emptyBox('No hay datos suficientes para calcular el coste por hora.');
     }
 
+    final maxEnergy = rows.fold<double>(0, (max, row) => math.max(max, row.energyWh));
+    final maxCost = rows.fold<double>(0, (max, row) => math.max(max, row.costEur));
+
     return pw.Container(
       height: 126,
       padding: const pw.EdgeInsets.all(10),
-      decoration: _boxDecoration(),
+      decoration: boxDecoration(),
       child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.end,
         children: rows.map((row) {
@@ -178,10 +180,11 @@ class ReportPdfDatasource {
       headers: const ['Hora/Día', 'Consumo', 'PVPC', 'Coste'],
       data: rows.map((row) => [
         shortDateHour(row.hour),
-        '${row.energyWh.toStringAsFixed(1)} Wh',
-        '${row.priceEurKwh.toStringAsFixed(4)} €/kWh',
-        '${row.costEur.toStringAsFixed(3)} €',
-      ]).toList(),
+        formatEnergy(row.energyWh),
+        '${row.priceEurKwh.toStringAsFixed(4)} EUR/kWh',
+          formatMoney(row.costEur),
+        ],
+      ).toList(),
     );
   }
 
@@ -193,11 +196,14 @@ class ReportPdfDatasource {
       headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
       headers: const ['Nombre', 'Tipo', 'Host/IP', 'Límites configurados'],
       data: data.devices.map((device) => [
-        device.name,
-        device.type,
-        device.identifier.isEmpty ? '-' : device.identifier,
-        'P: ${limit(device.maxPowerW, 'W')} · V: ${limit(device.maxVoltageV, 'V')} · I: ${limit(device.maxCurrentA, 'A')}',
-      ]).toList(),
+          device.name,
+          device.type,
+          device.identifier.isEmpty ? '-' : device.identifier,
+          'P: ${limit(device.maxPowerW, 'W')} · '
+              'V: ${limit(device.maxVoltageV, 'V')} · '
+              'I: ${limit(device.maxCurrentA, 'A')}',
+        ],
+      ).toList(),
     );
   }
 
@@ -213,66 +219,142 @@ class ReportPdfDatasource {
       headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
       headers: const ['Fecha', 'Dispositivo', 'Incidencia', 'Detalle'],
       data: data.incidents.take(8).map((incident) => [
-        dateTime(incident.createdAt),
-        incident.deviceName,
-        incident.title,
-        incident.description.isEmpty ? '-' : incident.description,
-      ]).toList(),
+          dateTime(incident.createdAt),
+          incident.deviceName,
+          incident.title,
+          incident.description.isEmpty ? '-' : incident.description,
+        ],
+      ).toList(),
     );
   }
 
   pw.Widget technicalSummary(ConsumptionReportData data) {
-    final cheapest = data.hourlyCosts.where((h) => h.priceEurKwh > 0).toList()
+    final withPrice = data.hourlyCosts
+        .where((item) => item.priceEurKwh > 0)
+        .toList();
+
+    final cheapest = [...withPrice]
       ..sort((a, b) => a.priceEurKwh.compareTo(b.priceEurKwh));
-    final mostExpensive = [...cheapest]..sort((a, b) => b.priceEurKwh.compareTo(a.priceEurKwh));
+
+    final mostExpensive = [...withPrice]
+      ..sort((a, b) => b.priceEurKwh.compareTo(a.priceEurKwh));
 
     return pw.Container(
       padding: const pw.EdgeInsets.all(10),
-      decoration: _boxDecoration(),
+      decoration: boxDecoration(),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text('Tensión máxima: ${data.peakVoltageV.toStringAsFixed(1)} V · Intensidad máxima: ${data.peakCurrentA.toStringAsFixed(2)} A'),
-          pw.Text('Horas con precio disponible: ${data.hourlyCosts.where((h) => h.priceEurKwh > 0).length} · Fuente: ${data.prices.isEmpty ? 'No disponible' : data.prices.first.source}'),
-          if (cheapest.isNotEmpty) pw.Text('Hora más barata: ${shortDateHour(cheapest.first.hour)} (${cheapest.first.priceEurKwh.toStringAsFixed(4)} €/kWh)'),
-          if (mostExpensive.isNotEmpty) pw.Text('Hora más cara: ${shortDateHour(mostExpensive.first.hour)} (${mostExpensive.first.priceEurKwh.toStringAsFixed(4)} €/kWh)'),
+          pw.Text('Tensión máxima: ${data.peakVoltageV.toStringAsFixed(1)} V · '
+                'Intensidad máxima: ${data.peakCurrentA.toStringAsFixed(2)} A',
+          ),
+          pw.Text('Horas con precio disponible: ${withPrice.length} · '
+                'Fuente: ${data.prices.isEmpty ? 'No disponible' : data.prices.first.source}',
+          ),
+          if (cheapest.isNotEmpty)
+            pw.Text('Hora más barata: ${shortDateHour(cheapest.first.hour)} '
+                  '(${cheapest.first.priceEurKwh.toStringAsFixed(4)} EUR/kWh)',
+            ),
+          if (mostExpensive.isNotEmpty)
+            pw.Text('Hora más cara: ${shortDateHour(mostExpensive.first.hour)} '
+                  '(${mostExpensive.first.priceEurKwh.toStringAsFixed(4)} EUR/kWh)',
+            ),
           pw.SizedBox(height: 4),
-          pw.Text('Nota: el coste es una estimación basada en energía registrada por el dispositivo y precio horario PVPC. No incluye potencia contratada, alquiler de contador, impuestos, descuentos ni otros conceptos de la factura.' , style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+          pw.Text('Nota: el coste es una estimación basada en la energía registrada '
+                'por el dispositivo y el precio horario PVPC. No incluye potencia '
+                'contratada, alquiler de contador, impuestos, descuentos ni otros '
+                'conceptos de la factura.',
+            style: const pw.TextStyle(
+              fontSize: 8,
+              color: PdfColors.grey700,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  pw.Widget emptyBox(String text) => pw.Container(
-    padding: const pw.EdgeInsets.all(10),
-    decoration: _boxDecoration(),
-    child: pw.Text(text, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
-  );
+  pw.Widget emptyBox(String text) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(10),
+      decoration: boxDecoration(),
+      child: pw.Text(text, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+      ),
+    );
+  }
 
-  pw.BoxDecoration _boxDecoration() => pw.BoxDecoration(
-    color: PdfColors.white,
-    borderRadius: pw.BorderRadius.circular(10),
-    border: pw.Border.all(color: PdfColor.fromHex('#D1D5DB')),
-  );
+  pw.BoxDecoration boxDecoration() {
+    return pw.BoxDecoration(
+      color: PdfColors.white,
+      borderRadius: pw.BorderRadius.circular(10),
+      border: pw.Border.all(color: PdfColor.fromHex('#D1D5DB')),
+    );
+  }
 
-  List<ReportHourlyCost> compactHourlyRows(List<ReportHourlyCost> rows, {required int maxRows}) {
+  List<ReportHourlyCost> compactHourlyRows(
+      List<ReportHourlyCost> rows, {required int maxRows,}) {
     if (rows.length <= maxRows) return rows;
     final step = (rows.length / maxRows).ceil();
     final result = <ReportHourlyCost>[];
+
     for (var i = 0; i < rows.length; i += step) {
       final group = rows.skip(i).take(step).toList();
-      final energy = group.fold<double>(0, (sum, r) => sum + r.energyWh);
-      final cost = group.fold<double>(0, (sum, r) => sum + r.costEur);
+      final energy = group.fold<double>(0, (sum, row) => sum + row.energyWh);
+      final cost = group.fold<double>(0, (sum, row) => sum + row.costEur);
       final avgPrice = energy <= 0 ? 0.0 : cost / (energy / 1000);
-      result.add(ReportHourlyCost(hour: group.first.hour, energyWh: energy, priceEurKwh: avgPrice, costEur: cost));
+
+      result.add(ReportHourlyCost(
+        hour: group.first.hour,
+        energyWh: energy,
+        priceEurKwh: avgPrice,
+        costEur: cost,
+      ),
+      );
     }
+
     return result;
   }
 
-  String limit(double? value, String unit) => value == null || value <= 0 ? '-' : '${value.toStringAsFixed(unit == 'A' ? 2 : 0)} $unit';
-  String date(DateTime d) => '${two(d.day)}/${two(d.month)}/${d.year}';
-  String dateTime(DateTime d) => '${date(d)} ${two(d.hour)}:${two(d.minute)}';
-  String shortHour(DateTime d) => '${two(d.hour)}h';
-  String shortDateHour(DateTime d) => '${two(d.day)}/${two(d.month)} ${two(d.hour)}h';
-  String two(int v) => v.toString().padLeft(2, '0');
+  String formatEnergy(double wh) {
+    if (wh < 1000) {
+      return '${wh.toStringAsFixed(2)} Wh';
+    }
+    return '${(wh / 1000).toStringAsFixed(3)} kWh';
+  }
+
+  String formatMoney(double eur) {
+    if (eur <= 0) return '0.0000 EUR';
+
+    if (eur < 0.01) {
+      return '${eur.toStringAsFixed(5)} EUR';
+    }
+
+    return '${eur.toStringAsFixed(2)} EUR';
+  }
+
+  String limit(double? value, String unit) {
+    if (value == null || value <= 0) return '-';
+
+    return '${value.toStringAsFixed(unit == 'A' ? 2 : 0)} $unit';
+  }
+
+  String date(DateTime date) {
+    return '${two(date.day)}/${two(date.month)}/${date.year}';
+  }
+
+  String dateTime(DateTime date) {
+    return '${this.date(date)} ${two(date.hour)}:${two(date.minute)}';
+  }
+
+  String shortHour(DateTime date) {
+    return '${two(date.hour)}h';
+  }
+
+  String shortDateHour(DateTime date) {
+    return '${two(date.day)}/${two(date.month)} ${two(date.hour)}h';
+  }
+
+  String two(int value) {
+    return value.toString().padLeft(2, '0');
+  }
 }
