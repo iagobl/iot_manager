@@ -13,8 +13,7 @@ class DevicesRepositoryImpl implements DevicesRepository {
       : baseRepository = DeviceBaseRepositoryImpl(remoteDatasource),
         sharesRepository = DeviceSharesRepositoryImpl(remoteDatasource),
         incidentsRepository = DeviceIncidentsRepositoryImpl(remoteDatasource),
-        automationsRepository =
-        DeviceAutomationsRepositoryImpl(remoteDatasource),
+        automationsRepository = DeviceAutomationsRepositoryImpl(remoteDatasource),
         readingsRepository = DeviceReadingsRepositoryImpl(remoteDatasource),
         liveStateRepository = DeviceLiveStateRepositoryImpl(remoteDatasource);
 
@@ -39,7 +38,6 @@ class DevicesRepositoryImpl implements DevicesRepository {
     required String identifier,
     String protocol = 'http',
     String? homeId,
-    String? roomId,
   }) {
     return baseRepository.createManualDevice(
       name: name,
@@ -47,7 +45,6 @@ class DevicesRepositoryImpl implements DevicesRepository {
       identifier: identifier,
       protocol: protocol,
       homeId: homeId,
-      roomId: roomId,
     );
   }
 

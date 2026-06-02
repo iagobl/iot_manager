@@ -24,7 +24,6 @@ class DeviceBaseRepositoryImpl implements DeviceBaseRepository {
     required String identifier,
     String protocol = 'http',
     String? homeId,
-    String? roomId,
   }) async {
     try {
       return await remoteDatasource.createManualDevice(
@@ -33,7 +32,6 @@ class DeviceBaseRepositoryImpl implements DeviceBaseRepository {
         identifier: identifier,
         protocol: protocol,
         homeId: homeId,
-        roomId: roomId,
       );
     } catch (error) {
       throw ErrorMapper.mapFailure(error);

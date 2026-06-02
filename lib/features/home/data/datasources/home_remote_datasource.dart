@@ -32,7 +32,7 @@ class HomeRemoteDatasource {
       final devicesFuture = _client
           .from('devices')
           .select(
-        'id, home_id, room_id, name, device_type, protocol, identifier, '
+        'id, home_id, name, device_type, protocol, identifier, '
             'is_active, energy_today_wh, created_at',
       )
           .eq('owner_id', userId)
@@ -98,24 +98,6 @@ class HomeRemoteDatasource {
         throw const ValidationAppException('Identificador de hogar no válido.');
       }
 
-      // Primero desvinculamos dispositivos para evitar problemas de FK
-      await _client
-          .from('devices')
-          .update({
-        'home_id': null,
-        'room_id': null,
-      })
-          .eq('owner_id', userId)
-          .eq('home_id', homeId)
-          .timeout(const Duration(seconds: 15));
-
-      await _client
-          .from('rooms')
-          .delete()
-          .eq('home_id', homeId)
-          .timeout(const Duration(seconds: 15));
-
-      // Y por último eliminamos el hogar
       await _client
           .from('homes')
           .delete()

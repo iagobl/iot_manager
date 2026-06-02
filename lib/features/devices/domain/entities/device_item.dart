@@ -8,7 +8,6 @@ class DeviceItem {
     required this.isActive,
     required this.ownerId,
     required this.homeId,
-    required this.roomId,
     required this.energyTodayWh,
     this.isShared = false,
     this.shareStatus,
@@ -25,7 +24,6 @@ class DeviceItem {
       isActive: map['is_active'] as bool? ?? false,
       ownerId: map['owner_id'] as String? ?? '',
       homeId: map['home_id'] as String?,
-      roomId: map['room_id'] as String?,
       energyTodayWh: ((map['energy_today_wh'] ?? 0) as num).toDouble(),
       isShared: map['is_shared'] as bool? ?? false,
       shareStatus: map['share_status'] as String?,
@@ -41,7 +39,6 @@ class DeviceItem {
   final bool isActive;
   final String ownerId;
   final String? homeId;
-  final String? roomId;
   final double energyTodayWh;
   final bool isShared;
   final String? shareStatus;
@@ -57,7 +54,6 @@ class DeviceItem {
       'is_active': isActive,
       'owner_id': ownerId,
       'home_id': homeId,
-      'room_id': roomId,
       'energy_today_wh': energyTodayWh,
       'is_shared': isShared,
       'share_status': shareStatus,

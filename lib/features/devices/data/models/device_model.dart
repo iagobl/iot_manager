@@ -10,7 +10,6 @@ class DeviceModel extends DeviceItem {
     required super.isActive,
     required super.ownerId,
     required super.homeId,
-    required super.roomId,
     required super.energyTodayWh,
     super.isShared,
     super.shareStatus,
@@ -27,12 +26,10 @@ class DeviceModel extends DeviceItem {
       isActive: map['is_active'] as bool? ?? false,
       ownerId: map['owner_id'] as String? ?? '',
       homeId: map['home_id'] as String?,
-      roomId: map['room_id'] as String?,
       energyTodayWh: ((map['energy_today_wh'] ?? 0) as num).toDouble(),
       isShared: map['is_shared'] as bool? ?? false,
       shareStatus: map['share_status'] as String?,
       ownerEmail: map['owner_email'] as String?,
     );
   }
-
 }

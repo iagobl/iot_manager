@@ -75,7 +75,6 @@ class DevicesRemoteDatasource {
     required String identifier,
     String protocol = 'http',
     String? homeId,
-    String? roomId,
   }) {
     return baseDatasource.createManualDevice(
       name: name,
@@ -83,7 +82,6 @@ class DevicesRemoteDatasource {
       identifier: identifier,
       protocol: protocol,
       homeId: homeId,
-      roomId: roomId,
     );
   }
 

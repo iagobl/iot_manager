@@ -12,7 +12,6 @@ class CreateManualDevice {
     required String identifier,
     String protocol = 'http',
     String? homeId,
-    String? roomId,
   }) {
     return repository.createManualDevice(
       name: name,
@@ -20,7 +19,6 @@ class CreateManualDevice {
       identifier: identifier,
       protocol: protocol,
       homeId: homeId,
-      roomId: roomId,
     );
   }
 }

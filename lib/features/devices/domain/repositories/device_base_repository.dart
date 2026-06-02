@@ -9,7 +9,6 @@ abstract class DeviceBaseRepository {
     required String identifier,
     String protocol = 'http',
     String? homeId,
-    String? roomId,
   });
 
   Future<void> updateDeviceState(String deviceId, bool isActive);

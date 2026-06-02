@@ -16,7 +16,8 @@ class DeviceBaseRemoteDatasource with DeviceDatasourceShared {
       final ownedDevices = (ownedResponse as List)
           .map((item) => Map<String, dynamic>.from(item as Map)).toList();
 
-      final sharesResponse = await client.from('device_shares')
+      final sharesResponse = await client
+          .from('device_shares')
           .select('device_id, owner_id, status')
           .eq('shared_with_user_id', userId)
           .eq('status', 'accepted')
@@ -110,7 +111,6 @@ class DeviceBaseRemoteDatasource with DeviceDatasourceShared {
     required String identifier,
     String protocol = 'http',
     String? homeId,
-    String? roomId,
   }) async {
     try {
       final userId = requireUserId();
@@ -131,7 +131,6 @@ class DeviceBaseRemoteDatasource with DeviceDatasourceShared {
         'is_active': false,
         'owner_id': userId,
         'home_id': homeId,
-        'room_id': roomId,
         'energy_today_wh': 0,
       }).select().single();
 
