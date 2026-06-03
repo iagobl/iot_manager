@@ -41,11 +41,6 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   @override
-  Future<void> updateNotificationPreferences(Map<String, dynamic> preferences) {
-    return remoteDatasource.updateNotificationPreferences(preferences);
-  }
-
-  @override
   Future<String> uploadAvatar({required Uint8List bytes, required String extension}) {
     return remoteDatasource.uploadAvatar(bytes: bytes, extension: extension);
   }

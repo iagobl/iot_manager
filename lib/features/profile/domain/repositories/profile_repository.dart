@@ -13,8 +13,6 @@ abstract class ProfileRepository {
 
   Future<void> updateUnitPreferences(Map<String, dynamic> preferences);
 
-  Future<void> updateNotificationPreferences(Map<String, dynamic> preferences);
-
   Future<String> uploadAvatar({required Uint8List bytes, required String extension});
 
   Future<String?> createAvatarSignedUrl(String? path);

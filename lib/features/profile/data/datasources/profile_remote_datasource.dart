@@ -38,12 +38,6 @@ class ProfileRemoteDatasource {
               'power': 'W',
               'voltage': 'V',
             },
-        'notification_preferences': row?['notification_preferences'] ??
-            {
-              'incidents': true,
-              'device_status': true,
-              'sharing': true,
-            },
       };
 
       return merged;
@@ -96,25 +90,6 @@ class ProfileRemoteDatasource {
 
       await client.from('profiles').update({
         'unit_preferences': preferences,
-      })
-          .eq('id', user.id)
-          .timeout(const Duration(seconds: 15));
-    } on TimeoutException {
-      throw const TimeoutAppException('La operación tardó demasiado. Revisa la conexión.');
-    } catch (e) {
-      throw ErrorMapper.mapException(e);
-    }
-  }
-
-  Future<void> updateNotificationPreferences(Map<String, dynamic> preferences) async {
-    try {
-      final user = currentUser;
-      if (user == null) {
-        throw const AuthAppException('No hay ninguna sesión activa.');
-      }
-
-      await client.from('profiles').update({
-        'notification_preferences': preferences,
       })
           .eq('id', user.id)
           .timeout(const Duration(seconds: 15));

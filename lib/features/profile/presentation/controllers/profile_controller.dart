@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:iot_manager/core/error/app_exception.dart';
 import 'package:iot_manager/core/error/error_mapper.dart';
@@ -9,7 +11,6 @@ import 'package:iot_manager/features/profile/domain/usecases/create_avatar_signe
 import 'package:iot_manager/features/profile/domain/usecases/get_current_profile.dart';
 import 'package:iot_manager/features/profile/domain/usecases/request_password_reset.dart';
 import 'package:iot_manager/features/profile/domain/usecases/update_basic_profile.dart';
-import 'package:iot_manager/features/profile/domain/usecases/update_notification_preferences.dart';
 import 'package:iot_manager/features/profile/domain/usecases/update_unit_preferences.dart';
 import 'package:iot_manager/features/profile/domain/usecases/upload_avatar.dart';
 
@@ -19,7 +20,6 @@ class ProfileController extends ChangeNotifier {
     GetCurrentProfile? getCurrentProfile,
     UpdateBasicProfile? updateBasicProfile,
     UpdateUnitPreferences? updateUnitPreferences,
-    UpdateNotificationPreferences? updateNotificationPreferences,
     UploadAvatar? uploadAvatar,
     CreateAvatarSignedUrl? createAvatarSignedUrl,
     ChangePassword? changePassword,
@@ -29,7 +29,6 @@ class ProfileController extends ChangeNotifier {
     getCurrentProfile: getCurrentProfile,
     updateBasicProfile: updateBasicProfile,
     updateUnitPreferences: updateUnitPreferences,
-    updateNotificationPreferences: updateNotificationPreferences,
     uploadAvatar: uploadAvatar,
     createAvatarSignedUrl: createAvatarSignedUrl,
     changePassword: changePassword,
@@ -41,27 +40,23 @@ class ProfileController extends ChangeNotifier {
         GetCurrentProfile? getCurrentProfile,
         UpdateBasicProfile? updateBasicProfile,
         UpdateUnitPreferences? updateUnitPreferences,
-        UpdateNotificationPreferences? updateNotificationPreferences,
         UploadAvatar? uploadAvatar,
         CreateAvatarSignedUrl? createAvatarSignedUrl,
         ChangePassword? changePassword,
         RequestPasswordReset? requestPasswordReset,
       })  : repository = resolvedRepository,
-        getCurrentProfile = getCurrentProfile ?? GetCurrentProfile(resolvedRepository),
-        updateBasicProfile = updateBasicProfile ?? UpdateBasicProfile(resolvedRepository),
-        updateUnitPreferences = updateUnitPreferences ?? UpdateUnitPreferences(resolvedRepository),
-        updateNotificationPreferences =
-            updateNotificationPreferences ?? UpdateNotificationPreferences(resolvedRepository),
+        getCurrentProfile =getCurrentProfile ?? GetCurrentProfile(resolvedRepository),
+        updateBasicProfile =updateBasicProfile ?? UpdateBasicProfile(resolvedRepository),
+        updateUnitPreferences =updateUnitPreferences ?? UpdateUnitPreferences(resolvedRepository),
         uploadAvatar = uploadAvatar ?? UploadAvatar(resolvedRepository),
-        createAvatarSignedUrl = createAvatarSignedUrl ?? CreateAvatarSignedUrl(resolvedRepository),
+        createAvatarSignedUrl =createAvatarSignedUrl ?? CreateAvatarSignedUrl(resolvedRepository),
         changePassword = changePassword ?? ChangePassword(resolvedRepository),
-        requestPasswordReset = requestPasswordReset ?? RequestPasswordReset(resolvedRepository);
+        requestPasswordReset =requestPasswordReset ?? RequestPasswordReset(resolvedRepository);
 
   final ProfileRepository repository;
   final GetCurrentProfile getCurrentProfile;
   final UpdateBasicProfile updateBasicProfile;
   final UpdateUnitPreferences updateUnitPreferences;
-  final UpdateNotificationPreferences updateNotificationPreferences;
   final UploadAvatar uploadAvatar;
   final CreateAvatarSignedUrl createAvatarSignedUrl;
   final ChangePassword changePassword;
@@ -183,31 +178,6 @@ class ProfileController extends ChangeNotifier {
       profile = profile!.copyWith(unitPreferences: updated);
       notifyListeners();
       return 'Preferencias de unidades actualizadas.';
-    } catch (e) {
-      setMappedError(e);
-      notifyListeners();
-      throw ErrorMapper.mapException(e);
-    }
-  }
-
-  Future<String> updateNotificationPreference({required String key, required bool value}) async {
-    if (profile == null) {
-      const ex = ValidationAppException('No se pudo cargar el perfil.');
-      setMappedError(ex);
-      notifyListeners();
-      throw ex;
-    }
-
-    final updated = Map<String, bool>.from(profile!.notificationPreferences)..[key] = value;
-
-    clearError();
-    notifyListeners();
-
-    try {
-      await updateNotificationPreferences(updated);
-      profile = profile!.copyWith(notificationPreferences: updated);
-      notifyListeners();
-      return 'Preferencias de notificaciones actualizadas.';
     } catch (e) {
       setMappedError(e);
       notifyListeners();

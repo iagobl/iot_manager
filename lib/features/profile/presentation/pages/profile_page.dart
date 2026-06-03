@@ -4,7 +4,6 @@ import 'package:iot_manager/core/widgets/app_background.dart';
 import 'package:iot_manager/core/widgets/glass_card.dart';
 import 'package:iot_manager/features/profile/presentation/controllers/profile_controller.dart';
 import 'package:iot_manager/features/profile/presentation/widgets/profile_header_card.dart';
-import 'package:iot_manager/features/profile/presentation/widgets/profile_notifications_card.dart';
 import 'package:iot_manager/features/profile/presentation/widgets/profile_personal_info_card.dart';
 import 'package:iot_manager/features/profile/presentation/widgets/profile_security_card.dart';
 
@@ -37,7 +36,9 @@ class ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     controller = ProfileController()..addListener(onControllerChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) {controller.load();});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.load();
+    });
   }
 
   @override
@@ -83,7 +84,9 @@ class ProfilePageState extends State<ProfilePage> {
 
   Future<void> showMessage(String message) async {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)),);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Future<void> saveBasicProfile() async {
@@ -108,11 +111,15 @@ class ProfilePageState extends State<ProfilePage> {
       );
 
       clearPasswordFields();
-      setState(() {showPasswordSection = false;});
+      setState(() {
+        showPasswordSection = false;
+      });
 
       await showMessage(message);
     } catch (_) {
-      await showMessage(controller.error ?? 'No se pudo actualizar la contraseña.');
+      await showMessage(
+        controller.error ?? 'No se pudo actualizar la contraseña.',
+      );
     }
   }
 
@@ -123,22 +130,33 @@ class ProfilePageState extends State<ProfilePage> {
         redirectTo: 'iotmanager://reset-password',
       );
     } catch (_) {
-      await showMessage(controller.error ?? 'No se pudo enviar el enlace de recuperación.');
+      await showMessage(
+        controller.error ?? 'No se pudo enviar el enlace de recuperación.',
+      );
     }
   }
 
   Future<void> pickAvatar(ImageSource source) async {
     try {
-      final file = await imagePicker.pickImage(source: source, imageQuality: 85, maxWidth: 1200);
+      final file = await imagePicker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1200,
+      );
 
       if (file == null) return;
 
       final bytes = await file.readAsBytes();
       final extension = extractExtension(file.path);
 
-      await controller.uploadAvatarFile(bytes: bytes, extension: extension,);
+      await controller.uploadAvatarFile(
+        bytes: bytes,
+        extension: extension,
+      );
     } catch (_) {
-      await showMessage(controller.error ?? 'No se pudo actualizar la foto de perfil.');
+      await showMessage(
+        controller.error ?? 'No se pudo actualizar la foto de perfil.',
+      );
     }
   }
 
@@ -153,14 +171,6 @@ class ProfilePageState extends State<ProfilePage> {
   Future<void> updateUnitPreference(String key, String value) async {
     try {
       await controller.updateUnitPreference(key: key, value: value);
-    } catch (_) {
-      await showMessage(controller.error ?? 'No se pudo guardar la preferencia.');
-    }
-  }
-
-  Future<void> updateNotificationPreference(String key, bool value) async {
-    try {
-      await controller.updateNotificationPreference(key: key, value: value);
     } catch (_) {
       await showMessage(controller.error ?? 'No se pudo guardar la preferencia.');
     }
@@ -186,7 +196,9 @@ class ProfilePageState extends State<ProfilePage> {
         borderRadius: BorderRadius.circular(18),
         borderSide: BorderSide(color: cs.primary, width: 1.4),
       ),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(18),),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+      ),
     );
   }
 
@@ -208,7 +220,9 @@ class ProfilePageState extends State<ProfilePage> {
                 actions: [
                   if (!controller.editMode)
                     TextButton.icon(
-                      onPressed: profile == null ? null : () {
+                      onPressed: profile == null
+                          ? null
+                          : () {
                         resetFieldsFromProfile();
                         controller.setEditMode(true);
                       },
@@ -221,18 +235,25 @@ class ProfilePageState extends State<ProfilePage> {
                       onPressed: () {
                         resetFieldsFromProfile();
                         clearPasswordFields();
-                        setState(() {showPasswordSection = false;});
+                        setState(() {
+                          showPasswordSection = false;
+                        });
                         controller.setEditMode(false);
-                      }, icon: const Icon(Icons.close_rounded),
+                      },
+                      icon: const Icon(Icons.close_rounded),
                     ),
                     TextButton.icon(
                       onPressed: controller.saving ? null : saveBasicProfile,
-                      icon: controller.saving ? const SizedBox(
+                      icon: controller.saving
+                          ? const SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
-                      ) : const Icon(Icons.save_rounded),
-                      label: Text(controller.saving ? 'Guardando...' : 'Guardar'),
+                      )
+                          : const Icon(Icons.save_rounded),
+                      label: Text(
+                        controller.saving ? 'Guardando...' : 'Guardar',
+                      ),
                     ),
                   ],
                 ],
@@ -308,32 +329,40 @@ class ProfilePageState extends State<ProfilePage> {
                           obscureNewPassword: obscureNewPassword,
                           obscureConfirmPassword: obscureConfirmPassword,
                           changingPassword: controller.changingPassword,
-                          requestingPasswordReset: controller.requestingPasswordReset,
-                          currentPasswordController: currentPasswordController,
+                          requestingPasswordReset:
+                          controller.requestingPasswordReset,
+                          currentPasswordController:
+                          currentPasswordController,
                           newPasswordController: newPasswordController,
-                          confirmNewPasswordController: confirmNewPasswordController,
+                          confirmNewPasswordController:
+                          confirmNewPasswordController,
                           onToggleSection: () {
                             setState(() {
                               showPasswordSection = !showPasswordSection;
-                              if (!showPasswordSection) {clearPasswordFields();}
+                              if (!showPasswordSection) {
+                                clearPasswordFields();
+                              }
                             });
                           },
                           onToggleCurrentPasswordVisibility: () {
-                            setState(() {obscureCurrentPassword = !obscureCurrentPassword;});
+                            setState(() {
+                              obscureCurrentPassword =
+                              !obscureCurrentPassword;
+                            });
                           },
                           onToggleNewPasswordVisibility: () {
-                            setState(() {obscureNewPassword = !obscureNewPassword;});
+                            setState(() {
+                              obscureNewPassword = !obscureNewPassword;
+                            });
                           },
                           onToggleConfirmPasswordVisibility: () {
-                            setState(() {obscureConfirmPassword = !obscureConfirmPassword;});
+                            setState(() {
+                              obscureConfirmPassword =
+                              !obscureConfirmPassword;
+                            });
                           },
                           onChangePassword: changePassword,
                           onRequestPasswordReset: requestPasswordReset,
-                        ),
-                        const SizedBox(height: 18),
-                        ProfileNotificationsCard(
-                          notificationPreferences: profile.notificationPreferences,
-                          onChanged: updateNotificationPreference,
                         ),
                       ],
                     ),
