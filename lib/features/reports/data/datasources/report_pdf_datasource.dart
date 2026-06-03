@@ -100,22 +100,22 @@ class ReportPdfDatasource {
       spacing: 8,
       runSpacing: 8,
       children: items.map((item) => pw.Container(
-          width: 168,
-          padding: const pw.EdgeInsets.all(10),
-          decoration: pw.BoxDecoration(
-            color: PdfColor.fromHex('#EFF6FF'),
-            borderRadius: pw.BorderRadius.circular(10),
-            border: pw.Border.all(color: PdfColor.fromHex('#BFDBFE')),
-          ),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(item.$1, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
-              pw.SizedBox(height: 3),
-              pw.Text(item.$2, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#1E3A8A'))),
-            ],
-          ),
+        width: 168,
+        padding: const pw.EdgeInsets.all(10),
+        decoration: pw.BoxDecoration(
+          color: PdfColor.fromHex('#EFF6FF'),
+          borderRadius: pw.BorderRadius.circular(10),
+          border: pw.Border.all(color: PdfColor.fromHex('#BFDBFE')),
         ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(item.$1, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+            pw.SizedBox(height: 3),
+            pw.Text(item.$2, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#1E3A8A'))),
+          ],
+        ),
+      ),
       ).toList(),
     );
   }
@@ -136,37 +136,113 @@ class ReportPdfDatasource {
 
     final maxEnergy = rows.fold<double>(0, (max, row) => math.max(max, row.energyWh));
     final maxCost = rows.fold<double>(0, (max, row) => math.max(max, row.costEur));
+    const chartHeight = 72.0;
 
     return pw.Container(
-      height: 126,
+      height: 138,
       padding: const pw.EdgeInsets.all(10),
       decoration: boxDecoration(),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.end,
-        children: rows.map((row) {
-          final energyHeight = maxEnergy <= 0 ? 0.0 : (row.energyWh / maxEnergy) * 78;
-          final costHeight = maxCost <= 0 ? 0.0 : (row.costEur / maxCost) * 78;
-          return pw.Expanded(
-            child: pw.Column(
-              mainAxisAlignment: pw.MainAxisAlignment.end,
-              children: [
-                pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.end,
-                  mainAxisAlignment: pw.MainAxisAlignment.center,
-                  children: [
-                    pw.Container(width: 5, height: math.max(2, energyHeight), color: PdfColor.fromHex('#2563EB')),
-                    pw.SizedBox(width: 2),
-                    pw.Container(width: 5, height: math.max(2, costHeight), color: PdfColor.fromHex('#F97316')),
-                  ],
-                ),
-                pw.SizedBox(height: 4),
-                pw.Text(shortHour(row.hour), style: const pw.TextStyle(fontSize: 6)),
-              ],
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Row(
+                children: [
+                  chartLegendItem(PdfColor.fromHex('#2563EB'), 'Consumo (Wh)'),
+                  pw.SizedBox(width: 10),
+                  chartLegendItem(PdfColor.fromHex('#F97316'), 'Coste (EUR)'),
+                ],
+              ),
+              pw.Text(
+                'Escala logarítmica',
+                style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 4),
+          pw.Row(
+            children: [
+              pw.Text(
+                'Máx. ${formatEnergy(maxEnergy)} / ${formatMoney(maxCost)}',
+                style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 4),
+          pw.Expanded(
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: rows.map((row) {
+                final energyHeight = logBarHeight(
+                  value: row.energyWh,
+                  maxValue: maxEnergy,
+                  maxHeight: chartHeight,
+                );
+                final costHeight = logBarHeight(
+                  value: row.costEur,
+                  maxValue: maxCost,
+                  maxHeight: chartHeight,
+                );
+
+                return pw.Expanded(
+                  child: pw.Column(
+                    mainAxisAlignment: pw.MainAxisAlignment.end,
+                    children: [
+                      pw.Row(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        mainAxisAlignment: pw.MainAxisAlignment.center,
+                        children: [
+                          pw.Container(
+                            width: 5,
+                            height: energyHeight,
+                            color: PdfColor.fromHex('#2563EB'),
+                          ),
+                          pw.SizedBox(width: 2),
+                          pw.Container(
+                            width: 5,
+                            height: costHeight,
+                            color: PdfColor.fromHex('#F97316'),
+                          ),
+                        ],
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(shortHour(row.hour), style: const pw.TextStyle(fontSize: 6)),
+                    ],
+                  ),
+                );
+              }).toList(),
             ),
-          );
-        }).toList(),
+          ),
+        ],
       ),
     );
+  }
+
+  pw.Widget chartLegendItem(PdfColor color, String label) {
+    return pw.Row(
+      children: [
+        pw.Container(width: 7, height: 7, color: color),
+        pw.SizedBox(width: 3),
+        pw.Text(label, style: const pw.TextStyle(fontSize: 7)),
+      ],
+    );
+  }
+
+  double logBarHeight({
+    required double value,
+    required double maxValue,
+    required double maxHeight,
+  }) {
+    if (value <= 0 || maxValue <= 0) return 0;
+
+    final safeMax = math.max(value, maxValue);
+    final denominator = math.log(1 + safeMax);
+    if (denominator <= 0) return 0;
+
+    final ratio = math.log(1 + value) / denominator;
+    return math.max(3, ratio.clamp(0.0, 1.0) * maxHeight);
   }
 
   pw.Widget hourlyTable(ConsumptionReportData data) {
@@ -182,8 +258,8 @@ class ReportPdfDatasource {
         shortDateHour(row.hour),
         formatEnergy(row.energyWh),
         '${row.priceEurKwh.toStringAsFixed(4)} EUR/kWh',
-          formatMoney(row.costEur),
-        ],
+        formatMoney(row.costEur),
+      ],
       ).toList(),
     );
   }
@@ -196,13 +272,13 @@ class ReportPdfDatasource {
       headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
       headers: const ['Nombre', 'Tipo', 'Host/IP', 'Límites configurados'],
       data: data.devices.map((device) => [
-          device.name,
-          device.type,
-          device.identifier.isEmpty ? '-' : device.identifier,
-          'P: ${limit(device.maxPowerW, 'W')} · '
-              'V: ${limit(device.maxVoltageV, 'V')} · '
-              'I: ${limit(device.maxCurrentA, 'A')}',
-        ],
+        device.name,
+        device.type,
+        device.identifier.isEmpty ? '-' : device.identifier,
+        'P: ${limit(device.maxPowerW, 'W')} · '
+            'V: ${limit(device.maxVoltageV, 'V')} · '
+            'I: ${limit(device.maxCurrentA, 'A')}',
+      ],
       ).toList(),
     );
   }
@@ -219,11 +295,11 @@ class ReportPdfDatasource {
       headerStyle: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
       headers: const ['Fecha', 'Dispositivo', 'Incidencia', 'Detalle'],
       data: data.incidents.take(8).map((incident) => [
-          dateTime(incident.createdAt),
-          incident.deviceName,
-          incident.title,
-          incident.description.isEmpty ? '-' : incident.description,
-        ],
+        dateTime(incident.createdAt),
+        incident.deviceName,
+        incident.title,
+        incident.description.isEmpty ? '-' : incident.description,
+      ],
       ).toList(),
     );
   }
@@ -246,24 +322,24 @@ class ReportPdfDatasource {
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Text('Tensión máxima: ${data.peakVoltageV.toStringAsFixed(1)} V · '
-                'Intensidad máxima: ${data.peakCurrentA.toStringAsFixed(2)} A',
+              'Intensidad máxima: ${data.peakCurrentA.toStringAsFixed(2)} A',
           ),
           pw.Text('Horas con precio disponible: ${withPrice.length} · '
-                'Fuente: ${data.prices.isEmpty ? 'No disponible' : data.prices.first.source}',
+              'Fuente: ${data.prices.isEmpty ? 'No disponible' : data.prices.first.source}',
           ),
           if (cheapest.isNotEmpty)
             pw.Text('Hora más barata: ${shortDateHour(cheapest.first.hour)} '
-                  '(${cheapest.first.priceEurKwh.toStringAsFixed(4)} EUR/kWh)',
+                '(${cheapest.first.priceEurKwh.toStringAsFixed(4)} EUR/kWh)',
             ),
           if (mostExpensive.isNotEmpty)
             pw.Text('Hora más cara: ${shortDateHour(mostExpensive.first.hour)} '
-                  '(${mostExpensive.first.priceEurKwh.toStringAsFixed(4)} EUR/kWh)',
+                '(${mostExpensive.first.priceEurKwh.toStringAsFixed(4)} EUR/kWh)',
             ),
           pw.SizedBox(height: 4),
           pw.Text('Nota: el coste es una estimación basada en la energía registrada '
-                'por el dispositivo y el precio horario PVPC. No incluye potencia '
-                'contratada, alquiler de contador, impuestos, descuentos ni otros '
-                'conceptos de la factura.',
+              'por el dispositivo y el precio horario PVPC. No incluye potencia '
+              'contratada, alquiler de contador, impuestos, descuentos ni otros '
+              'conceptos de la factura.',
             style: const pw.TextStyle(
               fontSize: 8,
               color: PdfColors.grey700,
