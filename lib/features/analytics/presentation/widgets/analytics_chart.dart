@@ -91,7 +91,7 @@ class AnalyticsChart extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: scheme.outlineVariant.withValues(alpha: 0.45)),
+                  color: scheme.outlineVariant.withValues(alpha: 0.45)),
             ),
             child: SizedBox(
               height: 320,
@@ -631,12 +631,24 @@ class GroupedHistogramPainter extends CustomPainter {
 
       for (final tick in yTicks) {
         final y = chartRect.bottom - (chartRect.height * tick);
-        final powerValue = normalizationPower * tick;
-        final voltageValue = normalizationVoltage * tick;
-        final currentValue = normalizationCurrent * tick;
+        final powerValue = logValueAtRatio(
+          ratio: tick,
+          normalizationValue: normalizationPower,
+          scaleUnit: 1.0,
+        );
+        final voltageValue = logValueAtRatio(
+          ratio: tick,
+          normalizationValue: normalizationVoltage,
+          scaleUnit: 1.0,
+        );
+        final currentValue = logValueAtRatio(
+          ratio: tick,
+          normalizationValue: normalizationCurrent,
+          scaleUnit: 0.001,
+        );
 
         final displayValue = powerValue > voltageValue ? powerValue : voltageValue > currentValue ? voltageValue : currentValue;
-        final label = displayValue >= 10 ? displayValue.toStringAsFixed(0) : displayValue.toStringAsFixed(1);
+        final label = formatAxisLabel(displayValue);
 
         final tp = TextPainter(
           text: TextSpan(
@@ -709,9 +721,9 @@ class GroupedHistogramPainter extends CustomPainter {
       )..layout(maxWidth: size.width * 0.85);
 
       tp.paint(canvas, Offset(
-          (size.width - tp.width) / 2,
-          (size.height - tp.height) / 2,
-        ),
+        (size.width - tp.width) / 2,
+        (size.height - tp.height) / 2,
+      ),
       );
       return;
     }
@@ -736,9 +748,21 @@ class GroupedHistogramPainter extends CustomPainter {
       final bucket = buckets[i];
       final baseX = chartRect.left + (bucketWidth * i) + ((bucketWidth - groupWidth) / 2);
 
-      final powerRatio = normalizedRatio(bucket.power, normalizationPower);
-      final voltageRatio = normalizedRatio(bucket.voltage, normalizationVoltage);
-      final currentRatio = normalizedRatio(bucket.current, normalizationCurrent);
+      final powerRatio = logarithmicRatio(
+        value: bucket.power,
+        normalizationValue: normalizationPower,
+        scaleUnit: 1.0,
+      );
+      final voltageRatio = logarithmicRatio(
+        value: bucket.voltage,
+        normalizationValue: normalizationVoltage,
+        scaleUnit: 1.0,
+      );
+      final currentRatio = logarithmicRatio(
+        value: bucket.current,
+        normalizationValue: normalizationCurrent,
+        scaleUnit: 0.001,
+      );
 
       if (bucket.power > 0) {
         drawBar(
@@ -843,9 +867,41 @@ class GroupedHistogramPainter extends CustomPainter {
     canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(6)), borderPaint);
   }
 
-  double normalizedRatio(double value, double normalizationValue) {
-    if (normalizationValue <= 0) return 0;
-    return (value / normalizationValue).clamp(0.0, 1.0);
+  double logarithmicRatio({
+    required double value,
+    required double normalizationValue,
+    required double scaleUnit,
+  }) {
+    if (!value.isFinite || value <= 0 || normalizationValue <= 0) return 0;
+
+    final safeScaleUnit = scaleUnit <= 0 ? 1.0 : scaleUnit;
+    final safeMax = math.max(value, normalizationValue);
+    final denominator = math.log(1 + (safeMax / safeScaleUnit));
+
+    if (denominator <= 0) return 0;
+
+    return (math.log(1 + (value / safeScaleUnit)) / denominator).clamp(0.0, 1.0);
+  }
+
+  double logValueAtRatio({
+    required double ratio,
+    required double normalizationValue,
+    required double scaleUnit,
+  }) {
+    if (ratio <= 0 || normalizationValue <= 0) return 0;
+
+    final safeScaleUnit = scaleUnit <= 0 ? 1.0 : scaleUnit;
+    final maxLog = math.log(1 + (normalizationValue / safeScaleUnit));
+
+    return safeScaleUnit * (math.exp(maxLog * ratio.clamp(0.0, 1.0)) - 1);
+  }
+
+  String formatAxisLabel(double value) {
+    if (!value.isFinite || value <= 0) return '0';
+    if (value >= 100) return value.toStringAsFixed(0);
+    if (value >= 10) return value.toStringAsFixed(1);
+    if (value >= 1) return value.toStringAsFixed(1);
+    return value.toStringAsFixed(2);
   }
 
   bool _shouldPaintLabel(int index, int total, AnalyticsChartMode mode) {
@@ -1155,9 +1211,9 @@ class RealtimeAggregateLinePainter extends CustomPainter {
       )..layout(maxWidth: size.width * 0.8);
 
       tp.paint(canvas, Offset(
-          (size.width - tp.width) / 2,
-          (size.height - tp.height) / 2,
-        ),
+        (size.width - tp.width) / 2,
+        (size.height - tp.height) / 2,
+      ),
       );
       return;
     }
@@ -1181,9 +1237,9 @@ class RealtimeAggregateLinePainter extends CustomPainter {
       )..layout(maxWidth: size.width * 0.8);
 
       tp.paint(canvas, Offset(
-          (size.width - tp.width) / 2,
-          (size.height - tp.height) / 2,
-        ),
+        (size.width - tp.width) / 2,
+        (size.height - tp.height) / 2,
+      ),
       );
       return;
     }
