@@ -12,7 +12,7 @@ class ReportPdfDatasource {
     pdf.addPage(
       pw.MultiPage(
         pageTheme: pageTheme(),
-        maxPages: 2,
+        maxPages: 4,
         build: (context) => [
           header(data),
           pw.SizedBox(height: 12),
@@ -22,7 +22,7 @@ class ReportPdfDatasource {
           hourlyCostChart(data),
           pw.SizedBox(height: 8),
           hourlyTable(data),
-          pw.SizedBox(height: 12),
+          pw.NewPage(),
           sectionTitle('Información del dispositivo o conjunto'),
           devicesTable(data),
           pw.SizedBox(height: 12),
