@@ -56,6 +56,7 @@ class ProfilePageState extends State<ProfilePage> {
 
   void onControllerChanged() {
     final profile = controller.profile;
+
     if (profile != null && !hydratedFields) {
       firstNameController.text = profile.firstName;
       lastNameController.text = profile.lastName;
@@ -84,6 +85,7 @@ class ProfilePageState extends State<ProfilePage> {
 
   Future<void> showMessage(String message) async {
     if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
@@ -96,9 +98,12 @@ class ProfilePageState extends State<ProfilePage> {
         lastName: lastNameController.text,
         email: emailController.text,
       );
+
       await showMessage(message);
     } catch (_) {
-      await showMessage(controller.error ?? 'No se pudo actualizar el perfil.');
+      await showMessage(
+        controller.error ?? 'No se pudo actualizar el perfil.',
+      );
     }
   }
 
@@ -111,6 +116,7 @@ class ProfilePageState extends State<ProfilePage> {
       );
 
       clearPasswordFields();
+
       setState(() {
         showPasswordSection = false;
       });
@@ -125,10 +131,12 @@ class ProfilePageState extends State<ProfilePage> {
 
   Future<void> requestPasswordReset() async {
     try {
-      await controller.sendPasswordRecoveryEmail(
+      final message = await controller.sendPasswordRecoveryEmail(
         email: emailController.text,
         redirectTo: 'iotmanager://reset-password',
       );
+
+      await showMessage(message);
     } catch (_) {
       await showMessage(
         controller.error ?? 'No se pudo enviar el enlace de recuperación.',
@@ -149,10 +157,12 @@ class ProfilePageState extends State<ProfilePage> {
       final bytes = await file.readAsBytes();
       final extension = extractExtension(file.path);
 
-      await controller.uploadAvatarFile(
+      final message = await controller.uploadAvatarFile(
         bytes: bytes,
         extension: extension,
       );
+
+      await showMessage(message);
     } catch (_) {
       await showMessage(
         controller.error ?? 'No se pudo actualizar la foto de perfil.',
@@ -162,18 +172,12 @@ class ProfilePageState extends State<ProfilePage> {
 
   String extractExtension(String path) {
     final lower = path.toLowerCase();
+
     if (lower.endsWith('.png')) return 'png';
     if (lower.endsWith('.webp')) return 'webp';
     if (lower.endsWith('.jpeg')) return 'jpeg';
-    return 'jpg';
-  }
 
-  Future<void> updateUnitPreference(String key, String value) async {
-    try {
-      await controller.updateUnitPreference(key: key, value: value);
-    } catch (_) {
-      await showMessage(controller.error ?? 'No se pudo guardar la preferencia.');
-    }
+    return 'jpg';
   }
 
   InputDecoration profileFieldDecoration({
@@ -190,11 +194,16 @@ class ProfilePageState extends State<ProfilePage> {
       fillColor: cs.surface.withValues(alpha: 0.55),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
-        borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.6)),
+        borderSide: BorderSide(
+          color: cs.outlineVariant.withValues(alpha: 0.6),
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
-        borderSide: BorderSide(color: cs.primary, width: 1.4),
+        borderSide: BorderSide(
+          color: cs.primary,
+          width: 1.4,
+        ),
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
@@ -235,9 +244,11 @@ class ProfilePageState extends State<ProfilePage> {
                       onPressed: () {
                         resetFieldsFromProfile();
                         clearPasswordFields();
+
                         setState(() {
                           showPasswordSection = false;
                         });
+
                         controller.setEditMode(false);
                       },
                       icon: const Icon(Icons.close_rounded),
@@ -276,7 +287,10 @@ class ProfilePageState extends State<ProfilePage> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.error_outline_rounded, size: 42),
+                              const Icon(
+                                Icons.error_outline_rounded,
+                                size: 42,
+                              ),
                               const SizedBox(height: 14),
                               Text(
                                 controller.error!,
@@ -331,14 +345,14 @@ class ProfilePageState extends State<ProfilePage> {
                           changingPassword: controller.changingPassword,
                           requestingPasswordReset:
                           controller.requestingPasswordReset,
-                          currentPasswordController:
-                          currentPasswordController,
+                          currentPasswordController: currentPasswordController,
                           newPasswordController: newPasswordController,
                           confirmNewPasswordController:
                           confirmNewPasswordController,
                           onToggleSection: () {
                             setState(() {
                               showPasswordSection = !showPasswordSection;
+
                               if (!showPasswordSection) {
                                 clearPasswordFields();
                               }

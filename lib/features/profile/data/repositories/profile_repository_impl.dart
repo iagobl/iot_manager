@@ -16,7 +16,8 @@ class ProfileRepositoryImpl implements ProfileRepository {
     final row = await remoteDatasource.fetchCurrentProfile();
     final model = ProfileModel.fromMap(row);
 
-    final avatarSignedUrl = model.avatarPath == null ? null
+    final avatarSignedUrl = model.avatarPath == null
+        ? null
         : await remoteDatasource.createAvatarSignedUrl(model.avatarPath);
 
     return model.copyWithModel(avatarSignedUrl: avatarSignedUrl);
@@ -36,13 +37,14 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   @override
-  Future<void> updateUnitPreferences(Map<String, dynamic> preferences) {
-    return remoteDatasource.updateUnitPreferences(preferences);
-  }
-
-  @override
-  Future<String> uploadAvatar({required Uint8List bytes, required String extension}) {
-    return remoteDatasource.uploadAvatar(bytes: bytes, extension: extension);
+  Future<String> uploadAvatar({
+    required Uint8List bytes,
+    required String extension,
+  }) {
+    return remoteDatasource.uploadAvatar(
+      bytes: bytes,
+      extension: extension,
+    );
   }
 
   @override
@@ -51,12 +53,24 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   @override
-  Future<void> changePassword({required String currentPassword, required String newPassword}) {
-    return remoteDatasource.changePassword(currentPassword: currentPassword, newPassword: newPassword);
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) {
+    return remoteDatasource.changePassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
   }
 
   @override
-  Future<void> requestPasswordReset({required String email, String? redirectTo}) {
-    return remoteDatasource.requestPasswordReset(email: email, redirectTo: redirectTo);
+  Future<void> requestPasswordReset({
+    required String email,
+    String? redirectTo,
+  }) {
+    return remoteDatasource.requestPasswordReset(
+      email: email,
+      redirectTo: redirectTo,
+    );
   }
 }

@@ -11,13 +11,20 @@ abstract class ProfileRepository {
     required String email,
   });
 
-  Future<void> updateUnitPreferences(Map<String, dynamic> preferences);
-
-  Future<String> uploadAvatar({required Uint8List bytes, required String extension});
+  Future<String> uploadAvatar({
+    required Uint8List bytes,
+    required String extension,
+  });
 
   Future<String?> createAvatarSignedUrl(String? path);
 
-  Future<void> changePassword({required String currentPassword, required String newPassword});
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  });
 
-  Future<void> requestPasswordReset({required String email, String? redirectTo});
+  Future<void> requestPasswordReset({
+    required String email,
+    String? redirectTo,
+  });
 }

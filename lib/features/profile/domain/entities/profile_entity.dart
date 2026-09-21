@@ -4,8 +4,6 @@ class ProfileEntity {
     required this.firstName,
     required this.lastName,
     required this.email,
-    required this.unitPreferences,
-    required this.notificationPreferences,
     this.avatarPath,
     this.avatarSignedUrl,
   });
@@ -16,16 +14,34 @@ class ProfileEntity {
   final String email;
   final String? avatarPath;
   final String? avatarSignedUrl;
-  final Map<String, String> unitPreferences;
-  final Map<String, bool> notificationPreferences;
 
-  String get fullName => '$firstName $lastName'.trim();
+  String get fullName {
+    final value = '$firstName $lastName'.trim();
+
+    if (value.isEmpty) {
+      return email;
+    }
+
+    return value;
+  }
 
   String get initials {
-    final first = firstName.trim().isEmpty ? '' : firstName.trim()[0];
-    final last = lastName.trim().isEmpty ? '' : lastName.trim()[0];
-    final text = '$first$last'.trim();
-    return text.isEmpty ? 'U' : text.toUpperCase();
+    final cleanFirstName = firstName.trim();
+    final cleanLastName = lastName.trim();
+
+    if (cleanFirstName.isNotEmpty && cleanLastName.isNotEmpty) {
+      return '${cleanFirstName[0]}${cleanLastName[0]}'.toUpperCase();
+    }
+
+    if (cleanFirstName.isNotEmpty) {
+      return cleanFirstName[0].toUpperCase();
+    }
+
+    if (email.trim().isNotEmpty) {
+      return email.trim()[0].toUpperCase();
+    }
+
+    return '?';
   }
 
   ProfileEntity copyWith({
@@ -35,8 +51,6 @@ class ProfileEntity {
     String? email,
     String? avatarPath,
     String? avatarSignedUrl,
-    Map<String, String>? unitPreferences,
-    Map<String, bool>? notificationPreferences,
   }) {
     return ProfileEntity(
       id: id ?? this.id,
@@ -45,9 +59,6 @@ class ProfileEntity {
       email: email ?? this.email,
       avatarPath: avatarPath ?? this.avatarPath,
       avatarSignedUrl: avatarSignedUrl ?? this.avatarSignedUrl,
-      unitPreferences: unitPreferences ?? this.unitPreferences,
-      notificationPreferences:
-      notificationPreferences ?? this.notificationPreferences,
     );
   }
 }
